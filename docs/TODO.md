@@ -193,3 +193,213 @@ Release Target: **v0.7.x Beta**
 
 Status: **IN PROGRESS**
 
+
+# BUILD_v0.1.2_TODO.md
+
+
+# PA-1 SCALPING PRO
+## PHOENIX Build v0.1.2 TODO
+
+**Project:** PA-1 SCALPING PRO  
+**Codename:** PHOENIX 🔥  
+**Build:** v0.1.2  
+**Sprint:** E01  
+**Status:** IN PROGRESS
+
+> Engine Thinks. Trader Executes.
+
+---
+
+# Objective
+
+Complete Build **v0.1.2** by improving renderer performance and stability without changing trading logic or architecture.
+
+Architecture remains **Frozen**.
+
+No new features are allowed during this build.
+
+---
+
+# Current Task
+
+## PA-005 — Renderer Refactor
+
+**Priority:** HIGH
+
+**Status:** TODO
+
+### Objective
+
+Refactor the rendering engine to eliminate unnecessary object recreation while preserving identical visual behavior.
+
+### Checklist
+
+- [ ] Replace temporary line objects with persistent line objects
+- [ ] Replace temporary label objects with persistent label objects
+- [ ] Review box object lifecycle (if applicable)
+- [ ] Reset renderer object handles correctly
+- [ ] Remove unnecessary object recreation
+- [ ] Preserve identical visual output
+- [ ] Compile successfully
+- [ ] No runtime errors
+
+### Definition of Done
+
+- [ ] Visual output matches Golden Baseline
+- [ ] No signal changes
+- [ ] No Risk Engine changes
+- [ ] No Decision Engine changes
+- [ ] No Trade Manager changes
+- [ ] Renderer lifecycle is stable
+
+---
+
+# PA-006 — Renderer Optimization
+
+**Priority:** HIGH
+
+**Status:** TODO
+
+### Checklist
+
+- [ ] Reduce redraw operations
+- [ ] Optimize line updates
+- [ ] Optimize label updates
+- [ ] Optimize table updates
+- [ ] Improve rendering performance
+- [ ] Reduce CPU usage
+
+---
+
+# PA-007 — Dashboard Polish
+
+**Priority:** MEDIUM
+
+**Status:** TODO
+
+### Checklist
+
+- [ ] Verify dashboard consistency
+- [ ] Improve spacing and layout
+- [ ] Verify dashboard settings
+- [ ] Verify status synchronization
+- [ ] Validate visual consistency
+
+---
+
+# PA-008 — Documentation Improvement
+
+**Priority:** MEDIUM
+
+**Status:** TODO
+
+### Checklist
+
+- [ ] Update CHANGELOG
+- [ ] Update Module Documentation
+- [ ] Update Architecture Notes
+- [ ] Update Build Notes
+
+---
+
+# PA-009 — Performance Audit
+
+**Priority:** HIGH
+
+**Status:** TODO
+
+### Checklist
+
+- [ ] Object Count Audit
+- [ ] Memory Audit
+- [ ] Runtime Audit
+- [ ] Performance Benchmark
+- [ ] Regression Verification
+
+---
+
+# PA-010 — Forward Live Validation
+
+**Priority:** HIGH
+
+**Status:** BLOCKED
+
+## Unlock Condition
+
+- [ ] PA-005 Complete
+- [ ] PA-006 Complete
+- [ ] PA-007 Complete
+- [ ] PA-008 Complete
+- [ ] PA-009 Complete
+
+---
+
+# Release Plan
+
+Current Build
+
+**v0.1.2**
+
+Next Build
+
+**v0.1.3**
+
+Target Release
+
+**v0.7.x Beta**
+
+---
+
+# Version Lifecycle
+
+- v0.6.x → Alpha ✅
+- v0.7.x → Beta
+- v0.8.x → Release Candidate
+- v1.0.0 → Stable
+
+---
+
+# Working Rules
+
+- Architecture Freeze remains active
+- Single Source of Truth
+- One Module = One Responsibility
+- No duplicate ownership
+- No new features before Build v0.1.2 is complete
+- Every completed task requires regression verification
+
+---
+
+# Sprint Workflow
+
+```
+PA-005
+    ↓
+PA-006
+    ↓
+PA-007
+    ↓
+PA-008
+    ↓
+PA-009
+    ↓
+PA-010
+    ↓
+Release v0.7.x Beta
+```
+
+---
+
+# Current Focus
+
+🟢 **PA-005 — Renderer Refactor**
+
+This is the only active development task.
+
+All other tasks remain pending until PA-005 is completed.
+
+---
+
+**Status:** IN PROGRESS
+
+**Engine Thinks. Trader Executes.**
