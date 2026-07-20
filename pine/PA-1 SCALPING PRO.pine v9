@@ -1,0 +1,5248 @@
+
+//@version=6
+//======================================================================
+// PA-1 SCALPING PRO
+// Project Codename : PHOENIX
+// Build            : 0.1.0
+// Module           : 01A - Core Header
+//
+// Engine Thinks. Trader Executes.
+//
+// Copyright © PA-1 Project
+//======================================================================
+
+indicator(
+     title = "PA-1 SCALPING PRO",
+     shorttitle = "PA-1",
+     overlay = true,
+     max_labels_count = 500,
+     max_lines_count  = 500,
+     max_boxes_count  = 500)
+
+//======================================================================
+// PROJECT INFORMATION
+//======================================================================
+
+const string PROJECT_NAME = "PA-1 SCALPING PRO"
+const string PROJECT_CODE = "PHOENIX"
+const string BUILD_VERSION = " 0.1.2"
+
+//======================================================================
+// PLACEHOLDER
+// Remove after Renderer Module is completed.
+//======================================================================
+
+plot(na, title = "PA-1 Placeholder")
+
+//======================================================================
+// MODULE 01B - CONFIGURATION ENGINE
+//======================================================================
+
+string GROUP_GENERAL = "General"
+string GROUP_DISPLAY = "Display"
+string GROUP_DEBUG   = "Debug"
+
+bool cfg_showDashboard  = input.bool(true, "Show Dashboard", group = GROUP_GENERAL)
+bool cfg_showTradeLines = input.bool(true, "Show Entry / SL / TP", group = GROUP_GENERAL)
+
+color cfg_buyColor  = input.color(color.lime, "BUY Color", group = GROUP_DISPLAY)
+color cfg_sellColor = input.color(color.red, "SELL Color", group = GROUP_DISPLAY)
+color cfg_waitColor = input.color(color.orange, "WAIT Color", group = GROUP_DISPLAY)
+
+bool cfg_debugMode = input.bool(false, "Engine Debug", group = GROUP_DEBUG)
+
+//======================================================================
+// MODULE 01.03 - CONSTANTS
+// BUILD : 0.1.2
+//======================================================================
+
+// TRADE STATES
+//--------------------------------------------------
+
+string TS_NO_TRADE    = "NO TRADE"
+string TS_WAIT        = "WAIT"
+string TS_BUY_READY   = "BUY READY"
+string TS_SELL_READY  = "SELL READY"
+string TS_BUY_ACTIVE  = "BUY ACTIVE"
+string TS_SELL_ACTIVE = "SELL ACTIVE"
+string TS_BREAK_EVEN  = "BREAK EVEN"
+string TS_TP_HIT      = "TP HIT"
+string TS_SL_HIT      = "SL HIT"
+//-------------------------
+// SIGNAL STATES
+//-------------------------
+
+string SIGNAL_BUY      = "BUY"
+string SIGNAL_SELL     = "SELL"
+string SIGNAL_WAIT     = "WAIT"
+string SIGNAL_NO_TRADE = "NO TRADE"
+
+//-------------------------
+// ENGINE STATUS
+//-------------------------
+
+string ENGINE_PENDING   = "PENDING"
+string ENGINE_CONFIRMED = "CONFIRMED"
+
+//-------------------------
+// RISK DEFAULTS
+//-------------------------
+
+float DEFAULT_RR = 2.0
+int   DEFAULT_SL_BUFFER = 2
+
+//-------------------------
+// VERSION
+//-------------------------
+
+//======================================================================
+// MODULE 01.04 - GLOBAL DATA MODEL
+// BUILD : 0.1.3
+//======================================================================
+
+//----------------------------------------------------
+// SIGNAL
+//----------------------------------------------------
+
+var string g_signal = SIGNAL_WAIT
+
+//----------------------------------------------------
+// TRADE STATE
+//----------------------------------------------------
+
+var string g_tradeState = TS_WAIT
+
+var string g_dashboardSignal = SIGNAL_WAIT
+var string g_dashboardStatus = TS_WAIT
+
+var float g_dashboardEntry = na
+var float g_dashboardSL = na
+var float g_dashboardTP = na
+
+//----------------------------------------------------
+// ENGINE STATUS
+//----------------------------------------------------
+
+var string g_engineStatus = ENGINE_PENDING
+
+//----------------------------------------------------
+// TRADE STATUS
+//----------------------------------------------------
+
+var bool g_tradeActive = false
+
+//----------------------------------------------------
+// TRADE PRICES
+//----------------------------------------------------
+
+var float g_entry = na
+var float g_sl    = na
+var float g_tp1   = na
+var float g_tp2   = na
+
+//----------------------------------------------------
+// LAST SIGNAL BAR
+//----------------------------------------------------
+
+var int g_signalBar = na
+
+//======================================================================
+// MODULE 01.05 - EXECUTION LAYER
+// BUILD : 0.1.4
+//======================================================================
+
+//----------------------------------------------------
+// BAR STATE
+//----------------------------------------------------
+
+bool g_barFirst = barstate.isfirst
+bool g_barLast = barstate.islast
+bool g_barNew = barstate.isnew
+bool g_barConfirmed = barstate.isconfirmed
+
+//----------------------------------------------------
+// MARKET TIME
+//----------------------------------------------------
+
+int g_barIndex = bar_index
+int g_lastBarIndex = last_bar_index
+
+//======================================================================
+// MODULE 01.06 - RENDERER BASE
+// BUILD : 0.1.5
+//======================================================================
+
+//----------------------------------------------------
+// RENDER OBJECTS
+//----------------------------------------------------
+
+var line g_entryLine = na
+var line g_slLine = na
+var line g_tp1Line = na
+var line g_tp2Line = na
+
+var label g_signalLabel = na
+
+//======================================================================
+// MODULE 02.01 - INSTRUMENT PROFILE
+// BUILD : 0.2.0
+//======================================================================
+
+string GROUP_PROFILE = "Instrument Profile"
+
+string cfg_instrumentProfile = input.string("FCPO", "Profile", options = ["FCPO", "Gold", "Forex", "Crypto", "Custom"], group = GROUP_PROFILE)
+
+bool cfg_enableSessionFilter = input.bool(true, "Enable Session Filter", group = GROUP_PROFILE)
+
+bool cfg_enableWeekendFilter = input.bool(true, "Enable Weekend Filter", group = GROUP_PROFILE)
+
+bool cfg_enableLunchFilter = input.bool(false, "Enable Lunch Filter", group = GROUP_PROFILE)
+
+//======================================================================
+// MODULE 02.02 - SESSION CONFIGURATION
+// BUILD : 0.2.1
+//======================================================================
+
+string GROUP_SESSION = "Session Settings"
+
+//----------------------------------------------------
+// FCPO DAY SESSION
+//----------------------------------------------------
+
+string cfg_daySession = input.session("1030-1230", "Day Session", group = GROUP_SESSION)
+
+//----------------------------------------------------
+// FCPO NIGHT SESSION
+//----------------------------------------------------
+
+string cfg_nightSession = input.session("1430-2330", "Night Session", group = GROUP_SESSION)
+
+//----------------------------------------------------
+// SESSION OPTIONS
+//----------------------------------------------------
+
+bool cfg_useDaySession = input.bool(true, "Enable Day Session", group = GROUP_SESSION)
+
+bool cfg_useNightSession = input.bool(true, "Enable Night Session", group = GROUP_SESSION)
+
+//======================================================================
+// MODULE 02.03 - SESSION DETECTION
+// BUILD : 0.2.2
+//======================================================================
+
+//----------------------------------------------------
+// SESSION DETECTION
+//----------------------------------------------------
+
+bool e_daySessionActive = not na(time("", cfg_daySession))
+
+bool e_nightSessionActive = not na(time("", cfg_nightSession))
+
+bool e_sessionActive =
+     (cfg_useDaySession and e_daySessionActive) or
+     (cfg_useNightSession and e_nightSessionActive)
+
+    //======================================================================
+// MODULE 02.04 - ENVIRONMENT VALIDATION
+// BUILD : 0.2.3
+//======================================================================
+
+//----------------------------------------------------
+// WEEKEND DETECTION
+//----------------------------------------------------
+
+bool e_isWeekend = dayofweek == dayofweek.saturday or dayofweek == dayofweek.sunday
+
+//----------------------------------------------------
+// MARKET STATUS
+//----------------------------------------------------
+
+bool e_marketOpen = e_sessionActive
+
+if cfg_enableWeekendFilter and e_isWeekend
+    e_marketOpen := false
+
+//----------------------------------------------------
+// ENVIRONMENT STATUS
+//----------------------------------------------------
+
+bool e_environmentOK = e_marketOpen
+
+//======================================================================
+// MODULE 03.01 - MARKET ENGINE CONFIGURATION
+// BUILD : 0.3.0
+//======================================================================
+
+string GROUP_MARKET = "Market Engine"
+
+int cfg_atrLength = input.int(14, "ATR Length", minval = 1, group = GROUP_MARKET)
+
+float cfg_volatilityMultiplier = input.float(1.5, "Volatility Multiplier", minval = 0.1, step = 0.1, group = GROUP_MARKET)
+
+bool cfg_enableMarketFilter = input.bool(true, "Enable Market Filter", group = GROUP_MARKET)
+
+//======================================================================
+// MODULE 03.02 - ATR ENGINE
+// BUILD : 0.3.1
+//======================================================================
+
+//----------------------------------------------------
+// ATR CALCULATION
+//----------------------------------------------------
+
+float e_atr = ta.atr(cfg_atrLength)
+
+//----------------------------------------------------
+// CURRENT RANGE
+//----------------------------------------------------
+
+float e_currentRange = high - low
+
+//----------------------------------------------------
+// VOLATILITY CHECK
+//----------------------------------------------------
+
+bool e_marketVolatile = e_currentRange > (e_atr * cfg_volatilityMultiplier)
+
+//======================================================================
+// MODULE 03.03 - MARKET STATE ENGINE
+// BUILD : 0.3.2
+//======================================================================
+
+//----------------------------------------------------
+// MARKET EXPANSION
+//----------------------------------------------------
+
+bool e_marketExpansion = e_currentRange > e_atr
+
+//----------------------------------------------------
+// MARKET COMPRESSION
+//----------------------------------------------------
+
+bool e_marketCompression = e_currentRange < e_atr
+
+//----------------------------------------------------
+// MARKET READY
+//----------------------------------------------------
+
+bool e_marketReady = not cfg_enableMarketFilter or e_marketVolatile
+
+//======================================================================
+// MODULE 03.04 - MARKET TREND FILTER
+// BUILD : 0.3.3
+//======================================================================
+
+//----------------------------------------------------
+// EMA SETTINGS
+//----------------------------------------------------
+
+int cfg_fastEMA = input.int(20, "Fast EMA", minval = 1, group = GROUP_MARKET)
+
+int cfg_slowEMA = input.int(50, "Slow EMA", minval = 2, group = GROUP_MARKET)
+
+//----------------------------------------------------
+// EMA CALCULATION
+//----------------------------------------------------
+
+float e_fastEMA = ta.ema(close, cfg_fastEMA)
+
+float e_slowEMA = ta.ema(close, cfg_slowEMA)
+
+//----------------------------------------------------
+// MARKET TREND
+//----------------------------------------------------
+
+bool e_marketBullish = e_fastEMA > e_slowEMA
+
+bool e_marketBearish = e_fastEMA < e_slowEMA
+
+bool e_marketTrending = e_marketBullish or e_marketBearish
+
+//======================================================================
+// MODULE 03.05 - MARKET CONFIDENCE ENGINE
+// BUILD : 0.3.4
+//======================================================================
+
+//----------------------------------------------------
+// MARKET CONFIDENCE SCORE
+//----------------------------------------------------
+
+int e_marketConfidence = 0
+
+e_marketConfidence := 0
+
+if e_sessionActive
+    e_marketConfidence += 20
+
+if e_marketReady
+    e_marketConfidence += 30
+
+if e_marketTrending
+    e_marketConfidence += 30
+
+if e_marketExpansion
+    e_marketConfidence += 20
+
+//----------------------------------------------------
+// MARKET STATUS
+//----------------------------------------------------
+
+bool e_marketStrong = e_marketConfidence >= 80
+
+//======================================================================
+// MODULE 04.01 - HTF CONFIGURATION
+// BUILD : 0.4.0
+//======================================================================
+
+string GROUP_HTF = "HTF Engine"
+
+//----------------------------------------------------
+// HIGHER TIMEFRAME
+//----------------------------------------------------
+
+string cfg_htfPrimary = input.timeframe("240", "Primary HTF", group = GROUP_HTF)
+
+string cfg_htfSecondary = input.timeframe("60", "Secondary HTF", group = GROUP_HTF)
+
+//----------------------------------------------------
+// HTF FILTER
+//----------------------------------------------------
+
+bool cfg_enableHTFFilter = input.bool(true, "Enable HTF Filter", group = GROUP_HTF)
+
+//======================================================================
+// MODULE 04.02 - HTF EMA ENGINE
+// BUILD : 0.4.1
+//======================================================================
+
+//----------------------------------------------------
+// HTF EMA SETTINGS
+//----------------------------------------------------
+
+int cfg_htfFastEMA = input.int(20, "HTF Fast EMA", minval = 1, group = GROUP_HTF)
+
+int cfg_htfSlowEMA = input.int(50, "HTF Slow EMA", minval = 2, group = GROUP_HTF)
+
+//----------------------------------------------------
+// HTF EMA VALUES
+//----------------------------------------------------
+
+float e_htfFastEMA = request.security(syminfo.tickerid, cfg_htfPrimary, ta.ema(close, cfg_htfFastEMA))
+
+float e_htfSlowEMA = request.security(syminfo.tickerid, cfg_htfPrimary, ta.ema(close, cfg_htfSlowEMA))
+
+//----------------------------------------------------
+// HTF TREND
+//----------------------------------------------------
+
+bool e_htfBullish = e_htfFastEMA > e_htfSlowEMA
+
+bool e_htfBearish = e_htfFastEMA < e_htfSlowEMA
+
+//======================================================================
+// MODULE 04.03 - HTF ALIGNMENT ENGINE
+// BUILD : 0.4.2
+//======================================================================
+
+//----------------------------------------------------
+// SECONDARY HTF EMA
+//----------------------------------------------------
+
+float e_htf2FastEMA = request.security(syminfo.tickerid, cfg_htfSecondary, ta.ema(close, cfg_htfFastEMA))
+
+float e_htf2SlowEMA = request.security(syminfo.tickerid, cfg_htfSecondary, ta.ema(close, cfg_htfSlowEMA))
+
+//----------------------------------------------------
+// SECONDARY HTF TREND
+//----------------------------------------------------
+
+bool e_htf2Bullish = e_htf2FastEMA > e_htf2SlowEMA
+
+bool e_htf2Bearish = e_htf2FastEMA < e_htf2SlowEMA
+
+//----------------------------------------------------
+// HTF ALIGNMENT
+//----------------------------------------------------
+
+bool e_htfAlignedBullish = e_htfBullish and e_htf2Bullish
+
+bool e_htfAlignedBearish = e_htfBearish and e_htf2Bearish
+
+bool e_htfReady = not cfg_enableHTFFilter or e_htfAlignedBullish or e_htfAlignedBearish
+
+//======================================================================
+// MODULE 05.01 - STRUCTURE CONFIGURATION
+// BUILD : 0.5.0
+//======================================================================
+
+string GROUP_STRUCTURE = "Structure Engine"
+
+//----------------------------------------------------
+// SWING SETTINGS
+//----------------------------------------------------
+
+int cfg_swingLength = input.int(5, "Swing Length", minval = 2, group = GROUP_STRUCTURE)
+
+//----------------------------------------------------
+// STRUCTURE FILTER
+//----------------------------------------------------
+
+bool cfg_enableStructureFilter = input.bool(true, "Enable Structure Filter", group = GROUP_STRUCTURE)
+
+//======================================================================
+// MODULE 05.02 - SWING ENGINE
+// BUILD : 0.5.1
+//======================================================================
+
+//----------------------------------------------------
+// SWING DETECTION
+//----------------------------------------------------
+
+float e_swingHigh = ta.pivothigh(high, cfg_swingLength, cfg_swingLength)
+
+float e_swingLow = ta.pivotlow(low, cfg_swingLength, cfg_swingLength)
+
+//----------------------------------------------------
+// LAST CONFIRMED SWINGS
+//----------------------------------------------------
+
+float e_lastSwingHigh = ta.valuewhen(not na(e_swingHigh), e_swingHigh, 0)
+
+float e_lastSwingLow = ta.valuewhen(not na(e_swingLow), e_swingLow, 0)
+
+//----------------------------------------------------
+// SWING READY
+//----------------------------------------------------
+
+bool e_swingReady = not na(e_lastSwingHigh) and not na(e_lastSwingLow)
+
+//======================================================================
+// MODULE 05.03 - BOS ENGINE
+// BUILD : 0.5.2
+//======================================================================
+
+//----------------------------------------------------
+// BREAK OF STRUCTURE
+//----------------------------------------------------
+
+bool e_bosBullish = e_swingReady and close > e_lastSwingHigh
+
+bool e_bosBearish = e_swingReady and close < e_lastSwingLow
+
+//----------------------------------------------------
+// STRUCTURE DIRECTION
+//----------------------------------------------------
+
+bool e_structureBullish = e_bosBullish
+
+bool e_structureBearish = e_bosBearish
+
+//----------------------------------------------------
+// BOS READY
+//----------------------------------------------------
+
+bool e_bosReady = e_bosBullish or e_bosBearish
+
+//======================================================================
+// MODULE 05.04 - CHOCH ENGINE
+// BUILD : 0.5.3
+//======================================================================
+
+//----------------------------------------------------
+// CHANGE OF CHARACTER
+//----------------------------------------------------
+
+bool e_chochBullish =
+     e_structureBearish[1] and
+     e_bosBullish
+
+bool e_chochBearish =
+     e_structureBullish[1] and
+     e_bosBearish
+
+//----------------------------------------------------
+// CHOCH READY
+//----------------------------------------------------
+
+bool e_chochReady =
+     e_chochBullish or
+     e_chochBearish
+
+    //======================================================================
+// MODULE 05.05 - STRUCTURE STATE ENGINE
+// BUILD : 0.5.4
+//======================================================================
+
+//----------------------------------------------------
+// STRUCTURE STATE
+//----------------------------------------------------
+
+bool e_structureUptrend = e_bosBullish and not e_chochBearish
+
+bool e_structureDowntrend = e_bosBearish and not e_chochBullish
+
+bool e_structureTransition =
+     e_chochBullish or
+     e_chochBearish
+
+bool e_structureRange =
+     not e_structureUptrend and
+     not e_structureDowntrend and
+     not e_structureTransition
+
+//----------------------------------------------------
+// STRUCTURE READY
+//----------------------------------------------------
+
+bool e_structureReady =
+     e_bosReady or
+     e_chochReady
+
+    //======================================================================
+// MODULE 05.06 - STRUCTURE CONFIDENCE
+// BUILD : 0.5.6
+//======================================================================
+
+//----------------------------------------------------
+// STRUCTURE CONFIDENCE
+//----------------------------------------------------
+
+int e_structureConfidence = 0
+
+e_structureConfidence := 0
+
+if e_swingReady
+    e_structureConfidence += 20
+
+if e_bosReady
+    e_structureConfidence += 30
+
+if e_chochReady
+    e_structureConfidence += 20
+
+if e_structureReady
+    e_structureConfidence += 30
+
+//----------------------------------------------------
+// STRUCTURE STRONG
+//----------------------------------------------------
+
+bool e_structureStrong = e_structureConfidence >= 70
+
+//======================================================================
+// MODULE 06.01 - LIQUIDITY CONFIGURATION
+// BUILD : 0.6.0
+//======================================================================
+
+string GROUP_LIQUIDITY = "Liquidity Engine"
+
+//----------------------------------------------------
+// LIQUIDITY SETTINGS
+//----------------------------------------------------
+
+int cfg_liquidityLookback = input.int(20, "Liquidity Lookback", minval = 5, group = GROUP_LIQUIDITY)
+
+bool cfg_enableLiquidityFilter = input.bool(true, "Enable Liquidity Filter", group = GROUP_LIQUIDITY)
+
+//======================================================================
+// MODULE 06.02 - BUY SIDE LIQUIDITY ENGINE
+// BUILD : 0.6.1
+//======================================================================
+
+//----------------------------------------------------
+// BUY SIDE LIQUIDITY
+//----------------------------------------------------
+
+float e_buySideLiquidity = ta.highest(high, cfg_liquidityLookback)
+
+//----------------------------------------------------
+// BUY SIDE SWEEP
+//----------------------------------------------------
+
+bool e_buySideSweep = high > e_buySideLiquidity[1]
+
+//----------------------------------------------------
+// BUY SIDE READY
+//----------------------------------------------------
+
+bool e_buySideReady = e_buySideSweep
+
+//======================================================================
+// MODULE 06.03 - SELL SIDE LIQUIDITY ENGINE
+// BUILD : 0.6.2
+//======================================================================
+
+float e_sellSideLiquidity = ta.lowest(low, cfg_liquidityLookback)
+
+bool e_sellSideSweep = low < e_sellSideLiquidity[1]
+
+bool e_sellSideReady = e_sellSideSweep
+
+//======================================================================
+// MODULE 06.04 - LIQUIDITY SWEEP ENGINE
+// BUILD : 0.6.3
+//======================================================================
+
+bool e_liquidityBullish = e_sellSideSweep
+
+bool e_liquidityBearish = e_buySideSweep
+
+bool e_liquiditySweep = e_liquidityBullish or e_liquidityBearish
+
+bool e_liquidityReady = not cfg_enableLiquidityFilter or e_liquiditySweep
+
+//======================================================================
+// MODULE 06.05 - LIQUIDITY CONFIDENCE ENGINE
+// BUILD : 0.6.4
+//======================================================================
+
+int e_liquidityConfidence = 0
+
+e_liquidityConfidence := 0
+
+if e_buySideReady
+    e_liquidityConfidence += 30
+
+if e_sellSideReady
+    e_liquidityConfidence += 30
+
+if e_liquiditySweep
+    e_liquidityConfidence += 40
+
+bool e_liquidityStrong = e_liquidityConfidence >= 70
+
+//======================================================================
+// MODULE 07.01 - PREMIUM / DISCOUNT CONFIGURATION
+// BUILD : 0.7.0
+//======================================================================
+
+string GROUP_PD = "Premium / Discount Engine"
+
+bool cfg_enablePDFilter = input.bool(true, "Enable Premium / Discount Filter", group = GROUP_PD)
+
+float cfg_pdEquilibrium = input.float(0.50, "Equilibrium Level", minval = 0.10, maxval = 0.90, step = 0.05, group = GROUP_PD)
+
+//======================================================================
+// MODULE 07.02 - DEALING RANGE ENGINE
+// BUILD : 0.7.1
+//======================================================================
+
+//----------------------------------------------------
+// DEALING RANGE
+//----------------------------------------------------
+
+float e_dealingRangeHigh = e_lastSwingHigh
+
+float e_dealingRangeLow = e_lastSwingLow
+
+float e_equilibrium = e_dealingRangeLow + ((e_dealingRangeHigh - e_dealingRangeLow) * cfg_pdEquilibrium)
+
+bool e_dealingRangeReady = not na(e_dealingRangeHigh) and not na(e_dealingRangeLow)
+
+//======================================================================
+// MODULE 07.03 - PREMIUM / DISCOUNT ZONES
+// BUILD : 0.7.2
+//======================================================================
+
+//----------------------------------------------------
+// PREMIUM / DISCOUNT ZONES
+//----------------------------------------------------
+
+bool e_inPremium = e_dealingRangeReady and close > e_equilibrium
+
+bool e_inDiscount = e_dealingRangeReady and close < e_equilibrium
+
+bool e_atEquilibrium = e_dealingRangeReady and close == e_equilibrium
+
+//======================================================================
+// MODULE 07.04 - PREMIUM / DISCOUNT CONFIDENCE
+// BUILD : 0.7.3
+//======================================================================
+
+//----------------------------------------------------
+// PREMIUM / DISCOUNT CONFIDENCE
+//----------------------------------------------------
+
+int e_pdConfidence = 0
+
+e_pdConfidence := 0
+
+if e_dealingRangeReady
+    e_pdConfidence += 30
+
+if e_inPremium or e_inDiscount
+    e_pdConfidence += 40
+
+if not e_atEquilibrium
+    e_pdConfidence += 30
+
+bool e_pdStrong = e_pdConfidence >= 70
+
+//======================================================================
+// MODULE 08.01 - ORDER BLOCK CONFIGURATION
+// BUILD : 0.8.0
+//======================================================================
+
+string GROUP_OB = "Order Block Engine"
+
+bool cfg_enableOBFilter = input.bool(true, "Enable Order Block Filter", group = GROUP_OB)
+
+int cfg_obLookback = input.int(20, "Order Block Lookback", minval = 5, group = GROUP_OB)
+
+//======================================================================
+// MODULE 08.02 - BULLISH ORDER BLOCK ENGINE
+// BUILD : 0.8.1
+//======================================================================
+
+float e_bullishOBHigh = ta.valuewhen(e_bosBullish, high[1], 0)
+
+float e_bullishOBLow = ta.valuewhen(e_bosBullish, low[1], 0)
+
+bool e_bullishOBReady = not na(e_bullishOBHigh) and not na(e_bullishOBLow)
+
+//======================================================================
+// MODULE 08.03 - BEARISH ORDER BLOCK ENGINE
+// BUILD : 0.8.2
+//======================================================================
+
+float e_bearishOBHigh = ta.valuewhen(e_bosBearish, high[1], 0)
+
+float e_bearishOBLow = ta.valuewhen(e_bosBearish, low[1], 0)
+
+bool e_bearishOBReady = not na(e_bearishOBHigh) and not na(e_bearishOBLow)
+
+//======================================================================
+// MODULE 08.04 - ORDER BLOCK VALIDATION
+// BUILD : 0.8.3
+//======================================================================
+
+bool e_validBullishOB = e_bullishOBReady and e_structureBullish and e_inDiscount
+
+bool e_validBearishOB = e_bearishOBReady and e_structureBearish and e_inPremium
+
+bool e_obReady = e_validBullishOB or e_validBearishOB
+
+//======================================================================
+// MODULE 08.05 - ORDER BLOCK CONFIDENCE
+// BUILD : 0.8.4
+//======================================================================
+
+int e_obConfidence = 0
+
+e_obConfidence := 0
+
+if e_bullishOBReady or e_bearishOBReady
+    e_obConfidence += 30
+
+if e_obReady
+    e_obConfidence += 40
+
+if e_validBullishOB or e_validBearishOB
+    e_obConfidence += 30
+
+bool e_obStrong = e_obConfidence >= 70
+
+//======================================================================
+// MODULE 09.01 - MITIGATION CONFIGURATION
+// BUILD : 0.9.0
+//======================================================================
+
+string GROUP_MITIGATION = "Mitigation Engine"
+
+bool cfg_enableMitigationFilter = input.bool(true, "Enable Mitigation Filter", group = GROUP_MITIGATION)
+
+int cfg_mitigationBufferTicks = input.int(2, "Mitigation Buffer (Ticks)", minval = 0, maxval = 10, group = GROUP_MITIGATION)
+
+float e_mitigationBuffer = cfg_mitigationBufferTicks * syminfo.mintick
+
+//======================================================================
+// MODULE 09.02 - BULLISH MITIGATION ENGINE
+// BUILD : 0.9.1
+//======================================================================
+
+bool e_bullishMitigation = e_bullishOBReady and low <= (e_bullishOBHigh + e_mitigationBuffer)
+
+bool e_bullishMitigationReady = e_bullishMitigation
+
+//======================================================================
+// MODULE 09.03 - BEARISH MITIGATION ENGINE
+// BUILD : 0.9.2
+//======================================================================
+
+bool e_bearishMitigation = e_bearishOBReady and high >= (e_bearishOBLow - e_mitigationBuffer)
+
+bool e_bearishMitigationReady = e_bearishMitigation
+
+//======================================================================
+// MODULE 09.04 - MITIGATION VALIDATION
+// BUILD : 0.9.3
+//======================================================================
+
+bool e_validBullishMitigation = e_bullishMitigationReady and e_validBullishOB
+
+bool e_validBearishMitigation = e_bearishMitigationReady and e_validBearishOB
+
+bool e_mitigationReady = e_validBullishMitigation or e_validBearishMitigation
+
+//======================================================================
+// MODULE 09.05 - MITIGATION CONFIDENCE
+// BUILD : 0.9.4
+//======================================================================
+
+int e_mitigationConfidence = 0
+
+e_mitigationConfidence := 0
+
+if e_bullishMitigationReady or e_bearishMitigationReady
+    e_mitigationConfidence += 30
+
+if e_mitigationReady
+    e_mitigationConfidence += 40
+
+if e_validBullishMitigation or e_validBearishMitigation
+    e_mitigationConfidence += 30
+
+bool e_mitigationStrong = e_mitigationConfidence >= 70
+
+
+//======================================================================
+// MODULE 10 - EVIDENCE ENGINE
+// BUILD : 0.2.0 ALPHA
+//
+// PURPOSE
+// Collect, evaluate and score bullish / bearish evidence
+// from all enabled Core Engines.
+//
+// INPUTS
+// M02 Environment
+// M03 Market
+// M04 HTFi
+// M05 Structure
+// M06 Liquidity
+// M07 Premium / Discount
+// M08 Order Block
+// M09 Mitigation
+//
+// OUTPUTS
+// e_bullEvidence
+// e_bearEvidence
+// e_bullScore
+// e_bearScore
+// e_bullDominant
+// e_bearDominant
+// e_scoreBalanced
+//
+//======================================================================
+
+//======================================================================
+// MODULE 10.01 - CONFIGURATION
+// BUILD : 0.2.0 ALPHA
+//======================================================================
+
+string GROUP_EVIDENCE = "Evidence Engine"
+
+bool cfg_enableEvidence = input.bool(
+        true,
+        "Enable Evidence Engine",
+        group = GROUP_EVIDENCE)
+
+bool cfg_showEvidenceDebug = input.bool(
+        false,
+        "Debug Evidence",
+        group = GROUP_EVIDENCE)
+
+//======================================================================
+// MODULE 10.02 - VARIABLES
+// BUILD : 0.2.0 ALPHA
+//======================================================================
+
+//----------------------------------------------------
+// Evidence Counter
+//----------------------------------------------------
+
+int e_bullEvidence = 0
+
+int e_bearEvidence = 0
+
+//----------------------------------------------------
+// Evidence Score
+//----------------------------------------------------
+
+float e_bullScore = 0.0
+
+float e_bearScore = 0.0
+
+//----------------------------------------------------
+// Total Evidence
+//----------------------------------------------------
+
+int e_totalEvidence = 0
+
+//----------------------------------------------------
+// Score Difference
+//----------------------------------------------------
+
+float e_scoreDifference = 0.0
+
+//----------------------------------------------------
+// Dominance
+//----------------------------------------------------
+
+bool e_bullDominant = false
+
+bool e_bearDominant = false
+
+bool e_scoreBalanced = false
+
+//----------------------------------------------------
+// Validation
+//----------------------------------------------------
+
+bool e_evidenceReady = false
+
+//----------------------------------------------------
+// Reset Every Bar
+//----------------------------------------------------
+
+e_bullEvidence := 0
+
+e_bearEvidence := 0
+
+e_totalEvidence := 0
+
+e_bullScore := 0.0
+
+e_bearScore := 0.0
+
+e_scoreDifference := 0.0
+
+e_bullDominant := false
+
+e_bearDominant := false
+
+e_scoreBalanced := false
+
+e_evidenceReady := false
+
+//======================================================================
+// MODULE 10.03 - EVIDENCE COLLECTION ENGINE
+// BUILD : 0.2.0 ALPHA
+//
+// PURPOSE
+// Collect bullish and bearish evidence from
+// all enabled Core Engines.
+//
+// INPUTS
+// M02 - Environment
+// M03 - Market
+// M04 - HTF
+// M05 - Structure
+// M06 - Liquidity
+// M07 - Premium / Discount
+// M08 - Order Block
+// M09 - Mitigation
+//
+// OUTPUTS
+// e_bullEvidence
+// e_bearEvidence
+//
+// CHANGE LOG
+// v0.2.0 ALPHA
+// • Initial implementation
+//======================================================================
+
+//----------------------------------------------------
+// MARKET ENGINE
+//----------------------------------------------------
+
+if cfg_enableEvidence and
+   cfg_enableMarketFilter and
+   e_marketStrong
+
+    if e_marketBullish
+        e_bullEvidence += 1
+
+    if e_marketBearish
+        e_bearEvidence += 1
+
+//----------------------------------------------------
+// HTF ENGINE
+//----------------------------------------------------
+
+if cfg_enableEvidence and
+   cfg_enableHTFFilter and
+   e_htfReady
+
+    if e_htfAlignedBullish
+        e_bullEvidence += 1
+
+    if e_htfAlignedBearish
+        e_bearEvidence += 1
+
+//----------------------------------------------------
+// STRUCTURE ENGINE
+//----------------------------------------------------
+
+if cfg_enableEvidence and
+   cfg_enableStructureFilter and
+   e_structureReady
+
+    if e_structureBullish
+        e_bullEvidence += 1
+
+    if e_structureBearish
+        e_bearEvidence += 1
+
+//----------------------------------------------------
+// LIQUIDITY ENGINE
+//----------------------------------------------------
+
+if cfg_enableEvidence and
+   cfg_enableLiquidityFilter and
+   e_liquidityReady
+
+    if e_liquidityBullish
+        e_bullEvidence += 1
+
+    if e_liquidityBearish
+        e_bearEvidence += 1
+
+//----------------------------------------------------
+// PREMIUM / DISCOUNT ENGINE
+//----------------------------------------------------
+
+if cfg_enableEvidence and
+   cfg_enablePDFilter and
+   e_dealingRangeReady
+
+    if e_inDiscount
+        e_bullEvidence += 1
+
+    if e_inPremium
+        e_bearEvidence += 1
+
+//----------------------------------------------------
+// ORDER BLOCK ENGINE
+//----------------------------------------------------
+
+if cfg_enableEvidence and
+   cfg_enableOBFilter and
+   e_obReady
+
+    if e_validBullishOB
+        e_bullEvidence += 1
+
+    if e_validBearishOB
+        e_bearEvidence += 1
+
+//----------------------------------------------------
+// MITIGATION ENGINE
+//----------------------------------------------------
+
+if cfg_enableEvidence and
+   cfg_enableMitigationFilter and
+   e_mitigationReady
+
+    if e_validBullishMitigation
+        e_bullEvidence += 1
+
+    if e_validBearishMitigation
+        e_bearEvidence += 1
+
+//======================================================================
+// MODULE 10.04 - EVIDENCE SCORE ENGINE
+// BUILD : 0.2.0 ALPHA
+//
+// PURPOSE
+// Convert Bull / Bear Evidence into percentage score.
+//
+// INPUTS
+// e_bullEvidence
+// e_bearEvidence
+//
+// OUTPUTS
+// e_totalEvidence
+// e_bullScore
+// e_bearScore
+// e_scoreDifference
+//
+// CHANGE LOG
+// v0.2.0 ALPHA
+// • Initial implementation
+//======================================================================
+
+//----------------------------------------------------
+// TOTAL EVIDENCE
+//----------------------------------------------------
+
+e_totalEvidence :=
+     e_bullEvidence +
+     e_bearEvidence
+
+//----------------------------------------------------
+// SCORE CALCULATION
+//----------------------------------------------------
+
+if e_totalEvidence > 0
+
+    e_bullScore :=
+         (float(e_bullEvidence) / float(e_totalEvidence)) * 100.0
+
+    e_bearScore :=
+         (float(e_bearEvidence) / float(e_totalEvidence)) * 100.0
+
+else
+
+    e_bullScore := 0.0
+    e_bearScore := 0.0
+
+//----------------------------------------------------
+// SCORE LIMITER
+//----------------------------------------------------
+
+e_bullScore :=
+     math.max(
+         0.0,
+         math.min(
+             100.0,
+             e_bullScore))
+
+e_bearScore :=
+     math.max(
+         0.0,
+         math.min(
+             100.0,
+             e_bearScore))
+
+//----------------------------------------------------
+// SCORE DIFFERENCE
+//----------------------------------------------------
+
+e_scoreDifference :=
+     math.abs(
+         e_bullScore -
+         e_bearScore)
+
+//----------------------------------------------------
+// DEBUG
+//----------------------------------------------------
+
+if cfg_showEvidenceDebug
+
+    label.new(
+         bar_index,
+         high,
+         "Bull Evidence : " + str.tostring(e_bullEvidence) +
+         "\nBear Evidence : " + str.tostring(e_bearEvidence) +
+         "\nTotal Evidence : " + str.tostring(e_totalEvidence) +
+         "\nBull Score : " + str.tostring(e_bullScore, "#.00") + "%" +
+         "\nBear Score : " + str.tostring(e_bearScore, "#.00") + "%" +
+         "\nDifference : " + str.tostring(e_scoreDifference, "#.00"),
+         style = label.style_label_down,
+         color = color.new(color.blue, 75),
+         textcolor = color.white,
+         size = size.small)
+
+//======================================================================
+// MODULE 10.05 - DOMINANCE ENGINE
+// BUILD : 0.2.0 ALPHA
+//
+// PURPOSE
+// Determine dominant market side based on
+// Bull / Bear Evidence Score.
+//
+// INPUTS
+// e_bullScore
+// e_bearScore
+// e_scoreDifference
+//
+// OUTPUTS
+// e_bullDominant
+// e_bearDominant
+// e_scoreBalanced
+// e_evidenceReady
+//
+// CHANGE LOG
+// v0.2.0 ALPHA
+// • Initial implementation
+//======================================================================
+
+//----------------------------------------------------
+// DOMINANT SIDE
+//----------------------------------------------------
+
+e_bullDominant := false
+e_bearDominant := false
+e_scoreBalanced := false
+
+if e_totalEvidence > 0
+
+    if e_scoreDifference <= 5.0
+
+        e_scoreBalanced := true
+
+    else
+
+        if e_bullScore > e_bearScore
+
+            e_bullDominant := true
+
+        if e_bearScore > e_bullScore
+
+            e_bearDominant := true
+
+//----------------------------------------------------
+// EVIDENCE STATUS
+//----------------------------------------------------
+
+e_evidenceReady :=
+     cfg_enableEvidence and
+     e_totalEvidence > 0
+
+
+//----------------------------------------------------
+// DEBUG
+//----------------------------------------------------
+
+
+//======================================================================
+// MODULE 10.06 - VALIDATION & OUTPUT ENGINE
+// BUILD : 0.2.0 ALPHA.3
+//
+// PURPOSE
+// Validate Evidence Engine output and prepare
+// standardized outputs for Module 11.
+//
+// INPUTS
+// e_totalEvidence
+// e_bullScore
+// e_bearScore
+// e_bullDominant
+// e_bearDominant
+// e_scoreBalanced
+//
+// OUTPUTS
+// e_evidenceReady
+// e_marketBias
+// e_signalBias
+// e_evidenceLevel
+//
+// CHANGE LOG
+// v0.2.0 ALPHA.3
+// • Added Persistent Output
+// • Added Constant Enumerations
+// • Added Reusable Debug Label
+// • Optimized Module 11 Integration
+//======================================================================
+
+//----------------------------------------------------
+// CONSTANTS
+//----------------------------------------------------
+
+const int BIAS_BEAR      = -1
+const int BIAS_BALANCED  = 0
+const int BIAS_BULL      = 1
+
+const int SIG_SELL    = -1
+const int SIG_WAIT    = 0
+const int SIG_BUY     = 1
+
+const int STRENGTH_NONE         = 0
+const int STRENGTH_WEAK         = 1
+const int STRENGTH_MODERATE     = 2
+const int STRENGTH_STRONG       = 3
+const int STRENGTH_VERY_STRONG  = 4
+const int STRENGTH_EXTREME      = 5
+
+//----------------------------------------------------
+// OUTPUT VARIABLES
+//----------------------------------------------------
+
+var int e_marketBias = BIAS_BALANCED
+
+var int e_signalBias = SIG_WAIT
+
+var int e_evidenceLevel = STRENGTH_NONE
+
+var label g_evidenceDebug = na
+
+//----------------------------------------------------
+// VALIDATION
+//----------------------------------------------------
+
+e_evidenceReady :=
+     cfg_enableEvidence and
+     e_totalEvidence > 0
+
+//----------------------------------------------------
+// MARKET BIAS
+//----------------------------------------------------
+
+e_marketBias := BIAS_BALANCED
+
+if e_evidenceReady
+
+    if e_bullDominant and not e_scoreBalanced
+        e_marketBias := BIAS_BULL
+
+    else if e_bearDominant and not e_scoreBalanced
+        e_marketBias := BIAS_BEAR
+
+//----------------------------------------------------
+// SIGNAL BIAS
+//----------------------------------------------------
+
+e_signalBias := SIG_WAIT
+
+if e_marketBias == BIAS_BULL
+    e_signalBias := SIG_BUY
+
+else if e_marketBias == BIAS_BEAR
+    e_signalBias := SIG_SELL
+
+//----------------------------------------------------
+// EVIDENCE STRENGTH
+//----------------------------------------------------
+
+e_evidenceLevel := STRENGTH_NONE
+
+if e_evidenceReady
+
+    if e_scoreDifference >= 80
+        e_evidenceLevel := STRENGTH_EXTREME
+
+    else if e_scoreDifference >= 60
+        e_evidenceLevel := STRENGTH_VERY_STRONG
+
+    else if e_scoreDifference >= 40
+        e_evidenceLevel := STRENGTH_STRONG
+
+    else if e_scoreDifference >= 20
+        e_evidenceLevel := STRENGTH_MODERATE
+
+    else
+        e_evidenceLevel := STRENGTH_WEAK
+
+//----------------------------------------------------
+// DEBUG
+//----------------------------------------------------
+
+if cfg_showEvidenceDebug and barstate.islast
+
+    if not na(g_evidenceDebug)
+        label.delete(g_evidenceDebug)
+
+    string biasText =
+         e_marketBias == BIAS_BULL ? "BULLISH" :
+         e_marketBias == BIAS_BEAR ? "BEARISH" :
+         "BALANCED"
+
+    string strengthText =
+         e_evidenceLevel == STRENGTH_EXTREME ? "EXTREME" :
+         e_evidenceLevel == STRENGTH_VERY_STRONG ? "VERY STRONG" :
+         e_evidenceLevel == STRENGTH_STRONG ? "STRONG" :
+         e_evidenceLevel == STRENGTH_MODERATE ? "MODERATE" :
+         e_evidenceLevel == STRENGTH_WEAK ? "WEAK" :
+         "NONE"
+
+    g_evidenceDebug :=
+         label.new(
+             bar_index,
+             high,
+             "===== M10 =====" +
+             "\nBull : " + str.tostring(e_bullScore, "#.0") + "%" +
+             "\nBear : " + str.tostring(e_bearScore, "#.0") + "%" +
+             "\nBias : " + biasText +
+             "\nStrength : " + strengthText +
+             "\nSignal : " + str.tostring(e_signalBias),
+             style = label.style_label_left,
+             color = color.new(color.blue, 70),
+             textcolor = color.white,
+             size = size.small)
+
+//======================================================================
+// MODULE 11.01 - CONFIGURATION
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+string GROUP_INTERPRETER = "Trade Qualification"
+
+//--------------------------------------------------
+// ENABLE
+//--------------------------------------------------
+
+bool cfg_enableInterpreter = input.bool(
+        true,
+        "Enable Trade Qualification",
+        group = GROUP_INTERPRETER)
+
+//--------------------------------------------------
+// MINIMUM CONFIDENCE
+//--------------------------------------------------
+
+float cfg_minConfidence = input.float(
+        70.0,
+        "Minimum Confidence",
+        minval = 0.0,
+        maxval = 100.0,
+        step = 1.0,
+        group = GROUP_INTERPRETER)
+
+//--------------------------------------------------
+// MINIMUM GRADE
+//--------------------------------------------------
+
+int cfg_minGrade =input.int(
+        2,
+        "Minimum Grade",
+        minval = 0,
+        maxval = 4,
+        group = GROUP_INTERPRETER)
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+bool cfg_showInterpreterDebug =input.bool(
+        false,
+        "Debug Trade Qualification",
+        group = GROUP_INTERPRETER)
+
+    //======================================================================
+// MODULE 11.02 - CONSTANTS
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// TRADE GRADE
+//--------------------------------------------------
+
+int GRADE_NO_TRADE = 0
+int GRADE_C        = 1
+int GRADE_B        = 2
+int GRADE_A        = 3
+int GRADE_A_PLUS   = 4
+
+//======================================================================
+// MODULE 11.03 - VARIABLES
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// TRADE CONFIDENCE
+//--------------------------------------------------
+
+float e_tradeConfidence = 0.0
+
+//--------------------------------------------------
+// TRADE GRADE
+//--------------------------------------------------
+
+int e_tradeGrade = GRADE_NO_TRADE
+
+string e_tradeGradeText = "NO TRADE"
+
+//--------------------------------------------------
+// TRADE STATUS
+//--------------------------------------------------
+
+bool e_tradeReady = false
+
+string e_tradeStatus = "WAIT"
+
+//======================================================================
+// MODULE 11.04 - CONFIDENCE ENGINE
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+e_tradeConfidence := 0.0
+
+float evidenceBonus = 0.0
+
+//--------------------------------------------------
+// ENGINE
+//--------------------------------------------------
+
+if cfg_enableInterpreter and e_evidenceReady
+
+    // Base Confidence
+    e_tradeConfidence := e_scoreDifference
+
+    // Evidence Bonus
+    switch e_evidenceLevel
+        STRENGTH_MODERATE =>
+            evidenceBonus := 5.0
+
+        STRENGTH_STRONG =>
+            evidenceBonus := 10.0
+
+        STRENGTH_VERY_STRONG =>
+            evidenceBonus := 15.0
+
+        STRENGTH_EXTREME =>
+            evidenceBonus := 20.0
+
+        =>
+            evidenceBonus := 0.0
+
+    // Final Confidence
+    e_tradeConfidence += evidenceBonus
+
+//--------------------------------------------------
+// LIMITER
+//--------------------------------------------------
+
+e_tradeConfidence := math.max(
+    0.0,
+    math.min(
+        100.0,
+        e_tradeConfidence))
+
+    //======================================================================
+// MODULE 11.05 - TRADE GRADE ENGINE
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+e_tradeGrade := GRADE_NO_TRADE
+e_tradeGradeText := "NO TRADE"
+
+//--------------------------------------------------
+// ENGINE
+//--------------------------------------------------
+
+if cfg_enableInterpreter and e_evidenceReady
+
+    if e_tradeConfidence >= 90.0
+        e_tradeGrade := GRADE_A_PLUS
+
+    else if e_tradeConfidence >= 80.0
+        e_tradeGrade := GRADE_A
+
+    else if e_tradeConfidence >= 70.0
+        e_tradeGrade := GRADE_B
+
+    else if e_tradeConfidence >= 60.0
+        e_tradeGrade := GRADE_C
+
+//--------------------------------------------------
+// GRADE TEXT
+//--------------------------------------------------
+
+switch e_tradeGrade
+
+    GRADE_A_PLUS =>
+        e_tradeGradeText := "A+"
+
+    GRADE_A =>
+        e_tradeGradeText := "A"
+
+    GRADE_B =>
+        e_tradeGradeText := "B"
+
+    GRADE_C =>
+        e_tradeGradeText := "C"
+
+    =>
+        e_tradeGradeText := "NO TRADE"
+
+    //======================================================================
+//======================================================================
+// MODULE 11.06 - TRADE QUALIFICATION ENGINE
+//======================================================================
+
+e_tradeReady := false
+e_tradeStatus := "NO TRADE"
+
+bool validEvidence   = e_evidenceReady
+bool validBias       = e_marketBias != BIAS_BALANCED
+bool validSignal     = e_signalBias != SIG_WAIT
+bool validConfidence = e_tradeConfidence >= cfg_minConfidence
+bool validGrade      = e_tradeGrade >= cfg_minGrade
+
+if cfg_enableInterpreter
+    if validEvidence and validBias and validSignal and validConfidence and validGrade
+        e_tradeReady := true
+
+if e_tradeReady
+    if e_signalBias == SIG_BUY
+        e_tradeStatus := "BUY"
+    else if e_signalBias == SIG_SELL
+        e_tradeStatus := "SELL"
+    else
+        e_tradeStatus := "WAIT"
+
+    //======================================================================
+// MODULE 11.07 - OUTPUT LAYER
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// PUBLIC OUTPUTS
+//--------------------------------------------------
+
+// e_tradeConfidence : 0 - 100
+// e_tradeGrade      : Numeric Grade
+// e_tradeGradeText  : Grade Text
+// e_tradeReady      : Trade Qualification
+// e_tradeStatus     : BUY / SELL / WAIT / NO TRADE
+
+// No additional processing required.
+// Variables are exposed for downstream modules.
+
+//======================================================================
+// MODULE 12.01 - CONFIGURATION
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+string GROUP_EXECUTION = "Execution Engine"
+
+bool cfg_enableExecution = input.bool(
+    true,
+    "Enable Execution Engine",
+    group = GROUP_EXECUTION)
+
+bool cfg_showExecutionDebug = input.bool(
+    false,
+    "Debug Execution",
+    group = GROUP_EXECUTION)
+
+//======================================================================
+// MODULE 12.02 - CONSTANTS
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// EXECUTION DECISION
+//--------------------------------------------------
+
+int EXEC_NO_TRADE = 0
+int EXEC_WAIT     = 1
+int EXEC_BUY      = 2
+int EXEC_SELL     = 3
+
+//--------------------------------------------------
+// EXECUTION DIRECTION
+//--------------------------------------------------
+
+int DIR_NONE  = 0
+int DIR_LONG  = 1
+int DIR_SHORT = -1
+
+//======================================================================
+// MODULE 12.03 - VARIABLES
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// EXECUTION ENGINE
+//--------------------------------------------------
+
+int ex_decision = EXEC_NO_TRADE
+
+bool ex_canTrade = false
+
+string ex_reason = ""
+
+//--------------------------------------------------
+// OUTPUT ENGINE
+//--------------------------------------------------
+
+int ex_direction = DIR_NONE
+
+string ex_status = "NO TRADE"
+
+string ex_text = "No Valid Setup"
+
+color ex_color = color.gray
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+var label g_executionDebug = na
+
+//======================================================================
+// MODULE 12.04 - DECISION ENGINE
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+ex_decision := EXEC_NO_TRADE
+ex_canTrade := false
+ex_reason := "Engine Disabled"
+
+//--------------------------------------------------
+// DECISION ENGINE
+//--------------------------------------------------
+
+if cfg_enableExecution
+
+    if not e_evidenceReady
+
+        ex_decision := EXEC_WAIT
+        ex_reason := "Evidence Not Ready"
+
+    else if not e_tradeReady
+
+        ex_decision := EXEC_WAIT
+        ex_reason := "Trade Not Ready"
+
+    else if e_marketBias == BIAS_BULL and e_signalBias == SIG_BUY
+
+        ex_decision := EXEC_BUY
+        ex_canTrade := true
+        ex_reason := "Bullish Confirmation"
+
+    else if e_marketBias == BIAS_BEAR and e_signalBias == SIG_SELL
+
+        ex_decision := EXEC_SELL
+        ex_canTrade := true
+        ex_reason := "Bearish Confirmation"
+
+    else
+
+        ex_decision := EXEC_WAIT
+        ex_canTrade := false
+        ex_reason := "Bias Conflict"
+
+    //======================================================================
+// MODULE 12.05 - VALIDATION ENGINE
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// VALIDATION
+//--------------------------------------------------
+
+bool ex_validDecision = ex_decision == EXEC_BUY or ex_decision == EXEC_SELL
+
+bool ex_validConfidence = e_tradeConfidence >= cfg_minConfidence
+
+bool ex_validGrade = e_tradeGrade >= cfg_minGrade
+
+bool ex_validBias = false
+
+if ex_decision == EXEC_BUY
+    ex_validBias := e_marketBias == BIAS_BULL and e_signalBias == SIG_BUY
+else if ex_decision == EXEC_SELL
+    ex_validBias := e_marketBias == BIAS_BEAR and e_signalBias == SIG_SELL
+
+//--------------------------------------------------
+// EXECUTION VALIDATION
+//--------------------------------------------------
+
+if cfg_enableExecution
+
+    ex_canTrade := false
+
+    if not e_tradeReady
+
+        ex_reason := "Trade Not Ready"
+
+    else if not ex_validDecision
+
+        ex_reason := "No Valid Decision"
+
+    else if not ex_validConfidence
+
+        ex_reason := "Low Confidence"
+
+    else if not ex_validGrade
+
+        ex_reason := "Low Grade"
+
+    else if not ex_validBias
+
+        ex_reason := "Bias Conflict"
+
+    else
+
+        ex_canTrade := true
+        ex_reason := "Execution Approved"
+
+//--------------------------------------------------
+// FAIL SAFE
+//--------------------------------------------------
+
+if not ex_canTrade
+
+    if ex_decision == EXEC_BUY or ex_decision == EXEC_SELL
+
+        ex_decision := EXEC_WAIT
+
+    //======================================================================
+// MODULE 12.06 - OUTPUT ENGINE
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+ex_direction := DIR_NONE
+ex_status := "NO TRADE"
+ex_text := "No Valid Setup"
+ex_color := color.gray
+
+//--------------------------------------------------
+// OUTPUT ENGINE
+//--------------------------------------------------
+
+if cfg_enableExecution
+
+    switch ex_decision
+
+        EXEC_BUY =>
+
+            if ex_canTrade
+
+                ex_direction := DIR_LONG
+                ex_status := "BUY"
+                ex_text := "BUY CONFIRMED"
+                ex_color := color.lime
+
+            else
+
+                ex_status := "WAIT"
+                ex_text := ex_reason
+                ex_color := color.orange
+
+        EXEC_SELL =>
+
+            if ex_canTrade
+
+                ex_direction := DIR_SHORT
+                ex_status := "SELL"
+                ex_text := "SELL CONFIRMED"
+                ex_color := color.red
+
+            else
+
+                ex_status := "WAIT"
+                ex_text := ex_reason
+                ex_color := color.orange
+
+        EXEC_WAIT =>
+
+            ex_status := "WAIT"
+            ex_text := ex_reason
+            ex_color := color.orange
+
+        =>
+
+            ex_status := "NO TRADE"
+            ex_text := ex_reason
+            ex_color := color.gray
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showExecutionDebug and barstate.islast
+
+    if not na(g_executionDebug)
+        label.delete(g_executionDebug)
+
+    g_executionDebug := label.new(
+        bar_index,
+        high,
+        "===== MODULE 12 =====" +
+        "\nStatus : " + ex_status +
+        "\nDecision : " + str.tostring(ex_decision) +
+        "\nDirection : " + str.tostring(ex_direction) +
+        "\nApproved : " + str.tostring(ex_canTrade) +
+        "\nReason : " + ex_reason,
+        style = label.style_label_left,
+        color = ex_canTrade ? color.new(color.green, 70) : color.new(color.red, 70),
+        textcolor = color.white,
+        size = size.small)
+
+    //======================================================================
+// MODULE 13.01 - CONFIGURATION
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+string GROUP_RISK = "Risk Management"
+
+bool cfg_enableRisk = input.bool(
+    true,
+    "Enable Risk Engine",
+    group = GROUP_RISK)
+
+float cfg_defaultRR = input.float(
+    2.0,
+    "Default Risk Reward",
+    minval = 1.0,
+    step = 0.5,
+    group = GROUP_RISK)
+
+int cfg_slBufferTicks = input.int(
+    2,
+    "SL Buffer (Ticks)",
+    minval = 0,
+    group = GROUP_RISK)
+
+bool cfg_enableBreakEven = input.bool(
+    true,
+    "Enable Break Even",
+    group = GROUP_RISK)
+
+float cfg_breakEvenRR = input.float(
+    1.0,
+    "Break-even Trigger (R)",
+    minval = 0.5,
+    step = 0.5,
+    group = GROUP_RISK)
+
+bool cfg_showRiskDebug = input.bool(
+    false,
+    "Debug Risk Engine",
+    group = GROUP_RISK)
+
+//======================================================================
+// MODULE 13.02 - CONSTANTS
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// ENTRY MODE
+//--------------------------------------------------
+
+int ENTRY_MARKET = 0
+int ENTRY_LIMIT  = 1
+int ENTRY_CONFIRM = 2
+
+//--------------------------------------------------
+// STOP LOSS MODE
+//--------------------------------------------------
+
+int SL_STRUCTURE = 0
+int SL_ATR       = 1
+int SL_FIXED     = 2
+
+//--------------------------------------------------
+// RISK STATUS
+//--------------------------------------------------
+
+int RM_INVALID = 0
+int RM_READY   = 1
+int RM_ACTIVE  = 2
+int RM_BE      = 3
+
+//======================================================================
+// MODULE 13.03 - VARIABLES
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RISK ENGINE
+//--------------------------------------------------
+
+float rm_entry = na
+
+float rm_stopLoss = na
+
+float rm_takeProfit = na
+
+float rm_riskDistance = na
+
+float rm_rewardDistance = na
+
+float rm_riskReward = cfg_defaultRR
+
+bool rm_breakEvenReady = false
+
+bool rm_setupReady = false
+
+bool rm_riskValid = false
+
+string rm_validationReason = "UNKNOWN"
+
+//--------------------------------------------------
+// BREAK EVEN
+//--------------------------------------------------
+
+float rm_breakEvenPrice = na
+
+//--------------------------------------------------
+// OUTPUT
+//--------------------------------------------------
+
+int rm_status = RM_INVALID
+
+string rm_statusText = "INVALID"
+
+color rm_color = color.gray
+
+bool rm_ready = false
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+var label g_riskDebug = na
+
+//======================================================================
+// MODULE 13.04 - ENTRY ENGINE
+// BUILD : 0.3.0 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// CONFIGURATION
+//--------------------------------------------------
+
+int cfg_entryMode = input.int(
+    ENTRY_MARKET,
+    "Entry Mode",
+    minval = 0,
+    maxval = 2,
+    group = GROUP_RISK)
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+rm_entry := na
+rm_setupReady := false
+
+//--------------------------------------------------
+// ENTRY ENGINE
+//--------------------------------------------------
+
+if cfg_enableRisk and ex_canTrade
+
+    switch cfg_entryMode
+
+        ENTRY_MARKET =>
+
+            rm_entry := close
+
+        ENTRY_LIMIT =>
+
+            if ex_direction == DIR_LONG
+                rm_entry := low
+            else if ex_direction == DIR_SHORT
+                rm_entry := high
+
+        ENTRY_CONFIRM =>
+
+            if ex_direction == DIR_LONG
+                rm_entry := math.max(open, close)
+            else if ex_direction == DIR_SHORT
+                rm_entry := math.min(open, close)
+
+//--------------------------------------------------
+// SETUP READY
+//--------------------------------------------------
+
+    rm_setupReady := not na(rm_entry)
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showRiskDebug and barstate.islast
+
+    if not na(g_riskDebug)
+        label.delete(g_riskDebug)
+
+    string rm_entryModeText =
+         cfg_entryMode == ENTRY_MARKET ? "MARKET" :
+         cfg_entryMode == ENTRY_LIMIT ? "LIMIT" :
+         "CONFIRM"
+
+    g_riskDebug := label.new(
+        bar_index,
+        high,
+        "===== MODULE 13 =====" +
+        "\nEntry Mode : " + rm_entryModeText +
+        "\nDirection : " + str.tostring(ex_direction) +
+        "\nEntry : " + str.tostring(rm_entry), 
+        style = label.style_label_left,
+        color = color.new(color.teal, 70),
+        textcolor = color.white,
+        size = size.small)
+
+//======================================================================
+// MODULE 13.05 - STOP LOSS ENGINE
+// BUILD : 0.3.1 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// CONFIGURATION
+//--------------------------------------------------
+
+int cfg_stopLossMode = input.int(
+    SL_STRUCTURE,
+    "Stop Loss Mode",
+    minval = 0,
+    maxval = 2,
+    group = GROUP_RISK)
+
+float cfg_fixedSLTicks = input.float(
+    10.0,
+    "Fixed SL (Ticks)",
+    minval = 1.0,
+    step = 1.0,
+    group = GROUP_RISK)
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+rm_stopLoss := na
+
+//--------------------------------------------------
+// STOP LOSS ENGINE
+//--------------------------------------------------
+
+if cfg_enableRisk and ex_canTrade
+
+    switch cfg_stopLossMode
+
+        //--------------------------------------------------
+        // STRUCTURE STOP
+        //--------------------------------------------------
+
+        SL_STRUCTURE =>
+
+            if ex_direction == DIR_LONG
+                rm_stopLoss := e_lastSwingLow - (cfg_slBufferTicks * syminfo.mintick)
+
+            else if ex_direction == DIR_SHORT
+                rm_stopLoss := e_lastSwingHigh + (cfg_slBufferTicks * syminfo.mintick)
+
+        //--------------------------------------------------
+        // ATR STOP
+        //--------------------------------------------------
+
+        SL_ATR =>
+
+            if ex_direction == DIR_LONG
+                rm_stopLoss := rm_entry - e_atr
+
+            else if ex_direction == DIR_SHORT
+                rm_stopLoss := rm_entry + e_atr
+
+        //--------------------------------------------------
+        // FIXED STOP
+        //--------------------------------------------------
+
+        SL_FIXED =>
+
+            if ex_direction == DIR_LONG
+                rm_stopLoss := rm_entry - (cfg_fixedSLTicks * syminfo.mintick)
+
+            else if ex_direction == DIR_SHORT
+                rm_stopLoss := rm_entry + (cfg_fixedSLTicks * syminfo.mintick)
+
+//--------------------------------------------------
+// VALIDATION
+//--------------------------------------------------
+
+if not na(rm_entry) and not na(rm_stopLoss)
+
+    if ex_direction == DIR_LONG and rm_stopLoss >= rm_entry
+        rm_stopLoss := na
+
+    else if ex_direction == DIR_SHORT and rm_stopLoss <= rm_entry
+        rm_stopLoss := na
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showRiskDebug and barstate.islast
+
+    if not na(g_riskDebug)
+        label.delete(g_riskDebug)
+
+    string rm_slModeText =
+         cfg_stopLossMode == SL_STRUCTURE ? "STRUCTURE" :
+         cfg_stopLossMode == SL_ATR ? "ATR" :
+         "FIXED"
+
+    g_riskDebug := label.new(
+        bar_index,
+        high,
+        "===== MODULE 13 SL =====" +
+        "\nMode : " + rm_slModeText +
+        "\nEntry : " + str.tostring(rm_entry) +
+        "\nSL : " + str.tostring(rm_stopLoss),
+        style = label.style_label_left,
+        color = color.new(color.red, 70),
+        textcolor = color.white,
+        size = size.small)
+
+    //======================================================================
+// MODULE 13.06 - TAKE PROFIT ENGINE
+// BUILD : 0.3.1 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+rm_takeProfit := na
+
+
+//--------------------------------------------------
+// RISK DISTANCE
+//--------------------------------------------------
+
+if not na(rm_entry) and not na(rm_stopLoss)
+
+    rm_riskDistance := math.abs(
+        rm_entry - rm_stopLoss)
+
+//--------------------------------------------------
+// TAKE PROFIT ENGINE
+//--------------------------------------------------
+
+if cfg_enableRisk and ex_canTrade and not na(rm_riskDistance)
+
+    if ex_direction == DIR_LONG
+
+        rm_takeProfit := rm_entry + (rm_riskDistance * rm_riskReward)
+
+    else if ex_direction == DIR_SHORT
+
+        rm_takeProfit := rm_entry - (rm_riskDistance * rm_riskReward)
+
+//--------------------------------------------------
+// VALIDATION
+//--------------------------------------------------
+
+if not na(rm_entry) and not na(rm_takeProfit)
+
+    if ex_direction == DIR_LONG and rm_takeProfit <= rm_entry
+
+        rm_takeProfit := na
+
+    else if ex_direction == DIR_SHORT and rm_takeProfit >= rm_entry
+
+        rm_takeProfit := na
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showRiskDebug and barstate.islast
+
+    if not na(g_riskDebug)
+        label.delete(g_riskDebug)
+
+    g_riskDebug := label.new(
+        bar_index,
+        high,
+        "===== MODULE 13 TP =====" +
+        "\nEntry : " + str.tostring(rm_entry) +
+        "\nSL : " + str.tostring(rm_stopLoss) +
+        "\nRisk : " + str.tostring(rm_riskDistance) +
+        "\nRR : 1 : " + str.tostring(rm_riskReward, "#.00") +
+        "\nTP : " + str.tostring(rm_takeProfit),
+        style = label.style_label_left,
+        color = color.new(color.green, 70),
+        textcolor = color.white,
+        size = size.small)
+
+//======================================================================
+// MODULE 13.07 - RISK : REWARD ENGINE
+// BUILD : 0.3.1 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+rm_riskReward := cfg_defaultRR
+
+//--------------------------------------------------
+// RISK : REWARD ENGINE
+//--------------------------------------------------
+
+if cfg_enableRisk and
+   ex_canTrade and
+   not na(rm_entry) and
+   not na(rm_stopLoss) and
+   not na(rm_takeProfit)
+
+    float rewardDistance = math.abs(rm_takeProfit - rm_entry)
+
+    if rm_riskDistance > 0
+
+        rm_riskReward := rewardDistance / rm_riskDistance
+
+//--------------------------------------------------
+// LIMITER
+//--------------------------------------------------
+
+rm_riskReward := math.max(0.0,rm_riskReward)
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showRiskDebug and barstate.islast
+
+    if not na(g_riskDebug)
+        label.delete(g_riskDebug)
+
+    g_riskDebug := label.new(
+        bar_index,
+        high,
+        "===== MODULE 13 RR =====" +
+        "\nRisk : " + str.tostring(rm_riskDistance) +
+        "\nReward : " + str.tostring(math.abs(rm_takeProfit - rm_entry)) +
+        "\nRR : " + str.tostring(rm_riskReward, "#.00"),
+        style = label.style_label_left,
+        color = color.new(color.blue, 70),
+        textcolor = color.white,
+        size = size.small)
+
+//======================================================================
+// MODULE 13.08 - BREAK EVEN ENGINE
+// BUILD : 0.3.1 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+rm_breakEvenReady := false
+rm_breakEvenPrice := na
+
+//--------------------------------------------------
+// BREAK EVEN ENGINE
+//--------------------------------------------------
+
+if cfg_enableRisk and
+   cfg_enableBreakEven and
+   ex_canTrade and
+   not na(rm_entry) and
+   not na(rm_stopLoss)
+
+    if not na(rm_riskDistance)
+
+        if ex_direction == DIR_LONG
+
+            if high >= rm_entry + (rm_riskDistance * cfg_breakEvenRR)
+
+                rm_breakEvenReady := true
+                rm_breakEvenPrice := rm_entry
+
+        else if ex_direction == DIR_SHORT
+
+            if low <= rm_entry - (rm_riskDistance * cfg_breakEvenRR)
+
+                rm_breakEvenReady := true
+                rm_breakEvenPrice := rm_entry
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showRiskDebug and barstate.islast
+
+    if not na(g_riskDebug)
+        label.delete(g_riskDebug)
+
+    g_riskDebug := label.new(
+        bar_index,
+        high,
+        "===== MODULE 13 BE =====" +
+        "\nTrigger : " + str.tostring(cfg_breakEvenRR) + "R" +
+        "\nReady : " + str.tostring(rm_breakEvenReady) +
+        "\nBE Price : " + str.tostring(rm_breakEvenPrice),
+        style = label.style_label_left,
+        color = color.new(color.orange, 70),
+        textcolor = color.white,
+        size = size.small)
+
+    //======================================================================
+// MODULE 13.09 - VALIDATION ENGINE
+// BUILD : 0.3.1 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+rm_ready := false
+rm_riskValid := false
+rm_validationReason := "UNKNOWN"
+
+//--------------------------------------------------
+// VALIDATION
+//--------------------------------------------------
+
+if not cfg_enableRisk
+
+    rm_validationReason := "Risk Engine Disabled"
+
+else if not ex_canTrade
+
+    rm_validationReason := "Execution Not Approved"
+
+else if na(rm_entry)
+
+    rm_validationReason := "Invalid Entry"
+
+else if na(rm_stopLoss)
+
+    rm_validationReason := "Invalid Stop Loss"
+
+else if na(rm_takeProfit)
+
+    rm_validationReason := "Invalid Take Profit"
+
+else if rm_stopLoss == rm_entry
+
+    rm_validationReason := "Zero Risk"
+
+else
+
+    rm_riskValid := true
+    rm_ready := true
+    rm_validationReason := "Risk Model Valid"
+
+//--------------------------------------------------
+// STATUS
+//--------------------------------------------------
+
+rm_status := RM_INVALID
+rm_statusText := "INVALID"
+rm_color := color.red
+
+if rm_ready and rm_setupReady
+
+    rm_status := RM_READY
+    rm_statusText := "READY"
+    rm_color := color.lime
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showRiskDebug and barstate.islast
+
+    if not na(g_riskDebug)
+        label.delete(g_riskDebug)
+
+    g_riskDebug := label.new(
+        bar_index,
+        high,
+        "===== MODULE 13 VALIDATION =====" +
+        "\nReady : " + str.tostring(rm_ready) +
+        "\nValid : " + str.tostring(rm_riskValid) +
+        "\nReason : " + rm_validationReason,
+        style = label.style_label_left,
+        color = color.new(rm_color, 70),
+        textcolor = color.white,
+        size = size.small)
+
+    //======================================================================
+// MODULE 13.10 - OUTPUT ENGINE
+// BUILD : 0.3.1 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// OUTPUT STATUS
+//--------------------------------------------------
+
+if rm_ready
+
+    if rm_breakEvenReady
+
+        rm_status := RM_BE
+        rm_statusText := "BREAK EVEN"
+        rm_color := color.orange
+
+    else
+
+        rm_status := RM_READY
+        rm_statusText := "READY"
+        rm_color := color.lime
+
+else
+
+    rm_status := RM_INVALID
+    rm_statusText := "INVALID"
+    rm_color := color.red
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showRiskDebug and barstate.islast
+
+    if not na(g_riskDebug)
+        label.delete(g_riskDebug)
+
+    g_riskDebug := label.new(
+         bar_index,
+         high,
+         "===== MODULE 13 OUTPUT =====" +
+         "\nStatus : " + rm_statusText +
+         "\nEntry : " + str.tostring(rm_entry) +
+         "\nSL : " + str.tostring(rm_stopLoss) +
+         "\nTP : " + str.tostring(rm_takeProfit) +
+         "\nBE : " + str.tostring(rm_breakEvenReady),
+         style = label.style_label_left,
+         color = color.new(rm_color, 70),
+         textcolor = color.white,
+         size = size.small)
+
+    //======================================================================
+// MODULE 13.12 - DASHBOARD SYNC ENGINE
+// BUILD : 0.4.2
+//======================================================================
+
+//--------------------------------------------------
+// DASHBOARD OWNERSHIP
+//--------------------------------------------------
+// Signal & Status owned by Module 18.
+// Module 13 only updates trade prices.
+
+//--------------------------------------------------
+// TRADE STATE
+//--------------------------------------------------
+//
+// Ownership moved to Module 17.
+// Module 13 only exposes Risk outputs.
+//
+//--------------------------------------------------
+// DASHBOARD VALUES
+//--------------------------------------------------
+
+g_dashboardEntry := rm_entry
+g_dashboardSL    := rm_stopLoss
+g_dashboardTP    := rm_takeProfit
+
+//======================================================================
+// MODULE 14.01 - DASHBOARD CONFIGURATION
+// BUILD : 0.5.0
+//======================================================================
+
+string GROUP_DASHBOARD = "Dashboard"
+
+//--------------------------------------------------
+// ENABLE
+//--------------------------------------------------
+
+//--------------------------------------------------
+// POSITION
+//--------------------------------------------------
+
+string cfg_dashboardPosition = input.string(
+     "Top Right",
+     "Position",
+     options = [
+          "Top Right",
+          "Top Left",
+          "Bottom Right",
+          "Bottom Left"],
+     group = GROUP_DASHBOARD)
+
+//--------------------------------------------------
+// MODE
+//--------------------------------------------------
+
+string cfg_dashboardMode = input.string(
+     "Compact",
+     "Dashboard Mode",
+     options = [
+          "Compact",
+          "Standard",
+          "Full"],
+     group = GROUP_DASHBOARD)
+
+//--------------------------------------------------
+// SIZE
+//--------------------------------------------------
+
+string cfg_dashboardSize = input.string(
+     "Small",
+     "Dashboard Size",
+     options = [
+          "Tiny",
+          "Small",
+          "Normal"],
+     group = GROUP_DASHBOARD)
+
+//--------------------------------------------------
+// THEME
+//--------------------------------------------------
+
+string cfg_dashboardTheme = input.string(
+     "Carbon Pro",
+     "Theme",
+     options = [
+          "Carbon Pro",
+          "Glass",
+          "Bloomberg",
+          "Minimal"],
+     group = GROUP_DASHBOARD)
+
+//--------------------------------------------------
+// TRANSPARENCY
+//--------------------------------------------------
+
+int cfg_dashboardTransparency = input.int(
+     15,
+     "Transparency",
+     minval = 0,
+     maxval = 100,
+     group = GROUP_DASHBOARD)
+
+
+//======================================================================
+// MODULE 14.02 - DASHBOARD DISPLAY SETTINGS
+// BUILD : 0.5.0
+//======================================================================
+
+//--------------------------------------------------
+// DISPLAY OPTIONS
+//--------------------------------------------------
+
+bool cfg_dashShowSignal = input.bool(
+     true,
+     "Show Signal",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowState = input.bool(
+     true,
+     "Show Trade State",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowEntry = input.bool(
+     true,
+     "Show Entry",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowSL = input.bool(
+     true,
+     "Show Stop Loss",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowTP = input.bool(
+     true,
+     "Show Take Profit",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowRR = input.bool(
+     true,
+     "Show Risk Reward",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowGrade = input.bool(
+     true,
+     "Show Grade",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowScore = input.bool(
+     true,
+     "Show Score",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowSession = input.bool(
+     true,
+     "Show Session",
+     group = GROUP_DASHBOARD)
+
+bool cfg_dashShowBuild = input.bool(
+     true,
+     "Show Build Version",
+     group = GROUP_DASHBOARD)
+
+    //======================================================================
+// MODULE 14.03 - DASHBOARD MANAGER
+// BUILD : 0.5.0
+//======================================================================
+
+//--------------------------------------------------
+// DASHBOARD POSITION
+//--------------------------------------------------
+
+string dashPosition = cfg_dashboardPosition
+
+//--------------------------------------------------
+// DASHBOARD SIZE
+//--------------------------------------------------
+
+string dashSize = cfg_dashboardSize
+
+//--------------------------------------------------
+// DASHBOARD MODE
+//--------------------------------------------------
+
+string dashMode = cfg_dashboardMode
+
+//--------------------------------------------------
+// DASHBOARD THEME
+//--------------------------------------------------
+
+string dashTheme = cfg_dashboardTheme
+
+//======================================================================
+// MODULE 14.04 - THEME MANAGER
+// BUILD : 0.5.0
+//======================================================================
+
+//--------------------------------------------------
+// THEME COLORS
+//--------------------------------------------------
+
+color dashBgColor     = color.new(color.black, 15)
+color dashBorderColor = color.new(color.gray, 40)
+color dashHeaderColor = color.white
+color dashTextColor   = color.white
+
+color dashBuyColor    = color.lime
+color dashSellColor   = color.red
+color dashWaitColor   = color.orange
+color dashBeColor     = color.aqua
+
+//--------------------------------------------------
+// CARBON PRO
+//--------------------------------------------------
+
+if dashTheme == "Carbon Pro"
+
+    dashBgColor     := color.new(color.black, cfg_dashboardTransparency)
+    dashBorderColor := color.new(color.gray, 50)
+    dashHeaderColor := color.white
+    dashTextColor   := color.white
+
+//--------------------------------------------------
+// GLASS
+//--------------------------------------------------
+
+else if dashTheme == "Glass"
+
+    dashBgColor     := color.new(color.gray, 85)
+    dashBorderColor := color.new(color.white, 80)
+    dashHeaderColor := color.white
+    dashTextColor   := color.white
+
+//--------------------------------------------------
+// BLOOMBERG
+//--------------------------------------------------
+
+else if dashTheme == "Bloomberg"
+
+    dashBgColor     := color.rgb(22,27,34)
+    dashBorderColor := color.rgb(255,140,0)
+    dashHeaderColor := color.rgb(255,140,0)
+    dashTextColor   := color.white
+
+//--------------------------------------------------
+// MINIMAL
+//--------------------------------------------------
+
+else
+
+    dashBgColor     := color.new(color.black, 90)
+    dashBorderColor := color.new(color.gray, 90)
+    dashHeaderColor := color.white
+    dashTextColor   := color.white
+
+//======================================================================
+// MODULE 14.05 - DASHBOARD RENDERER ENGINE
+// BUILD : 0.5.1
+//======================================================================
+
+//--------------------------------------------------
+// DASHBOARD TABLE
+//--------------------------------------------------
+
+var table g_dashboardTable = na
+
+//--------------------------------------------------
+// TABLE LAYOUT
+//--------------------------------------------------
+
+int dashColumns = 2
+int dashRows    = 12
+
+//--------------------------------------------------
+// TEXT SIZE (STRING MODE)
+//--------------------------------------------------
+
+string dashTextSize = "Small"
+
+if dashSize == "Tiny"
+    dashTextSize := "Tiny"
+
+else if dashSize == "Small"
+    dashTextSize := "Small"
+
+else
+    dashTextSize := "Normal"
+
+//======================================================================
+// MODULE 14.06A - TABLE POSITION RESOLVER
+// BUILD : 0.5.2
+//======================================================================
+
+//--------------------------------------------------
+// TABLE POSITION RESOLVER
+//--------------------------------------------------
+
+string dashPositionResolved = dashPosition
+
+if dashPosition == "Top Left"
+    dashPositionResolved := "Top Left"
+
+else if dashPosition == "Top Right"
+    dashPositionResolved := "Top Right"
+
+else if dashPosition == "Bottom Left"
+    dashPositionResolved := "Bottom Left"
+
+else if dashPosition == "Bottom Right"
+    dashPositionResolved := "Bottom Right"
+
+else
+    dashPositionResolved := "Top Right"
+
+//======================================================================
+// MODULE 14.06B - POSITION MAPPER
+// BUILD : 0.5.3
+//======================================================================
+
+//--------------------------------------------------
+// TABLE POSITION MAPPER
+//--------------------------------------------------
+
+string dashTablePosition = dashPositionResolved
+
+//======================================================================
+// MODULE 14.06C - TABLE CREATOR
+// BUILD : 0.5.4
+//======================================================================
+
+//--------------------------------------------------
+// CREATE DASHBOARD TABLE
+//--------------------------------------------------
+
+if cfg_showDashboard and na(g_dashboardTable)
+
+    if dashTablePosition == "Top Left"
+        g_dashboardTable := table.new(position.top_left, dashColumns, dashRows,
+             bgcolor = dashBgColor,
+             frame_color = dashBorderColor,
+             frame_width = 1,
+             border_width = 0)
+
+    else if dashTablePosition == "Top Right"
+        g_dashboardTable := table.new(position.top_right, dashColumns, dashRows,
+             bgcolor = dashBgColor,
+             frame_color = dashBorderColor,
+             frame_width = 1,
+             border_width = 0)
+
+    else if dashTablePosition == "Bottom Left"
+        g_dashboardTable := table.new(position.bottom_left, dashColumns, dashRows,
+             bgcolor = dashBgColor,
+             frame_color = dashBorderColor,
+             frame_width = 1,
+             border_width = 0)
+
+    else
+        g_dashboardTable := table.new(position.bottom_right, dashColumns, dashRows,
+             bgcolor = dashBgColor,
+             frame_color = dashBorderColor,
+             frame_width = 1,
+             border_width = 0)
+
+            //======================================================================
+// MODULE 14.06D - TABLE REBUILDER
+// BUILD : 0.5.5
+//======================================================================
+
+//--------------------------------------------------
+// TABLE REBUILD REQUEST
+//--------------------------------------------------
+
+bool dashRebuild = false
+
+//--------------------------------------------------
+// REBUILD TABLE
+//--------------------------------------------------
+
+if dashRebuild and not na(g_dashboardTable)
+
+    table.delete(g_dashboardTable)
+    g_dashboardTable := na
+
+//======================================================================
+// MODULE 14.07A - HEADER RENDERER
+// BUILD : 0.5.6
+//======================================================================
+
+//--------------------------------------------------
+// DASHBOARD HEADER
+//--------------------------------------------------
+
+if cfg_showDashboard and not na(g_dashboardTable)
+
+    table.cell(
+         g_dashboardTable,
+         0,
+         0,
+         "🔥 PA-1 SCALPING PRO",
+         text_color = dashHeaderColor,
+         bgcolor = dashBgColor
+    )
+
+    table.cell(
+         g_dashboardTable,
+         1,
+         0,
+         "Build"+ BUILD_VERSION,
+         text_color = dashHeaderColor,
+         bgcolor = dashBgColor
+    )
+
+//======================================================================
+// MODULE 14.07B - SIGNAL RENDERER
+// BUILD : 0.5.7
+//======================================================================
+
+//--------------------------------------------------
+// SIGNAL ROW
+//--------------------------------------------------
+
+if cfg_showDashboard and not na(g_dashboardTable)
+
+    table.cell(
+         g_dashboardTable,
+         0,
+         1,
+         "SIGNAL",
+         text_color = dashTextColor,
+         bgcolor = dashBgColor
+    )
+
+    table.cell(
+         g_dashboardTable,
+         1,
+         1,
+         g_dashboardSignal,
+         text_color = dashTextColor,
+         bgcolor = dashBgColor
+    )
+
+//======================================================================
+// MODULE 14.07C - TRADE RENDERER
+// BUILD : 0.5.8
+//======================================================================
+
+if cfg_showDashboard and not na(g_dashboardTable)
+
+    table.cell(g_dashboardTable, 0, 2, "ENTRY",
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(g_dashboardTable, 1, 2, str.tostring(g_dashboardEntry),
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(g_dashboardTable, 0, 3, "SL",
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(g_dashboardTable, 1, 3, str.tostring(g_dashboardSL),
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(g_dashboardTable, 0, 4, "TP",
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(g_dashboardTable, 1, 4, str.tostring(g_dashboardTP),
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+        //======================================================================
+// MODULE 14.07D - STATISTICS RENDERER
+// BUILD : 0.5.9
+//======================================================================
+
+if cfg_showDashboard and not na(g_dashboardTable)
+
+    table.cell(
+         g_dashboardTable, 0, 5, "RR",
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(
+         g_dashboardTable, 1, 5,
+         str.tostring(rm_riskReward,"#.00"),
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(
+         g_dashboardTable, 0, 6, "STATE",
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(
+         g_dashboardTable, 1, 6,
+         g_tradeState,
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(
+         g_dashboardTable, 0, 7, "STATUS",
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+    table.cell(
+         g_dashboardTable, 1, 7,
+         g_dashboardStatus,
+         text_color = dashTextColor,
+         bgcolor = dashBgColor)
+
+        
+    //======================================================================
+// MODULE 15.01 - SIGNAL RENDER CONFIGURATION
+// BUILD : 0.5.7
+//======================================================================
+
+string GROUP_RENDER = "Signal Renderer"
+
+//--------------------------------------------------
+// MASTER
+//--------------------------------------------------
+
+bool cfg_enableRenderer = input.bool(
+    true,
+    "Enable Signal Renderer",
+    group = GROUP_RENDER)
+
+//--------------------------------------------------
+// SIGNALS
+//--------------------------------------------------
+
+bool cfg_showBuyArrow = input.bool(
+    true,
+    "Show BUY Arrow",
+    group = GROUP_RENDER)
+
+bool cfg_showSellArrow = input.bool(
+    true,
+    "Show SELL Arrow",
+    group = GROUP_RENDER)
+
+bool cfg_showEntryLabel = input.bool(
+    true,
+    "Show Entry Label",
+    group = GROUP_RENDER)
+
+//--------------------------------------------------
+// TRADE LEVELS
+//--------------------------------------------------
+
+bool cfg_showSLLine = input.bool(
+    true,
+    "Show Stop Loss Line",
+    group = GROUP_RENDER)
+
+bool cfg_showTPLine = input.bool(
+    true,
+    "Show Take Profit Line",
+    group = GROUP_RENDER)
+
+bool cfg_showBreakEven = input.bool(
+    true,
+    "Show Break Even",
+    group = GROUP_RENDER)
+
+//--------------------------------------------------
+// STYLE
+//--------------------------------------------------
+
+color cfg_renderbuyColor = color.lime
+
+color cfg_rendersellColor = color.red
+
+color cfg_renderslColor = color.orange
+
+color cfg_rendertpColor = color.aqua
+
+color cfg_renderbeColor = color.blue
+
+//====================================================
+// SIGNAL RENDER OBJECTS
+//====================================================
+
+var label g_buyLabel  = na
+var label g_sellLabel = na
+var label g_beLabel = na
+
+//====================================================
+// SIGNAL CLEANUP
+//====================================================
+
+if barstate.isnew
+
+    if not na(g_buyLabel)
+        label.delete(g_buyLabel)
+
+    if not na(g_sellLabel)
+        label.delete(g_sellLabel)
+
+//====================================================
+// MODULE 15.03 - TRADE LEVEL RENDERER
+// BUILD : 0.5.7
+//====================================================
+
+//----------------------------------------------------
+// 15.03A - ENTRY LINE
+//----------------------------------------------------
+
+if cfg_enableRenderer and cfg_showEntryLabel
+
+    if not na(g_entryLine)
+        line.delete(g_entryLine)
+
+    if not na(g_dashboardEntry)
+
+        g_entryLine := line.new(
+             bar_index,
+             g_dashboardEntry,
+             bar_index + 20,
+             g_dashboardEntry,
+             extend = extend.none,
+             color = color.yellow,
+             width = 2)
+
+//----------------------------------------------------
+// 15.03B - STOP LOSS LINE
+//----------------------------------------------------
+
+if cfg_enableRenderer and cfg_showSLLine
+
+    if not na(g_slLine)
+        line.delete(g_slLine)
+
+    if not na(g_dashboardSL)
+
+        g_slLine := line.new(
+             bar_index,
+             g_dashboardSL,
+             bar_index + 20,
+             g_dashboardSL,
+             extend = extend.none,
+             color = color.orange,
+             width = 2)
+
+//----------------------------------------------------
+// 15.03C - TAKE PROFIT LINE
+//----------------------------------------------------
+
+if cfg_enableRenderer and cfg_showTPLine
+
+    if not na(g_tp1Line)
+        line.delete(g_tp1Line)
+
+    if not na(g_dashboardTP)
+
+        g_tp1Line := line.new(
+             bar_index,
+             g_dashboardTP,
+             bar_index + 20,
+             g_dashboardTP,
+             extend = extend.none,
+             color = cfg_rendertpColor,
+             width = 2)
+
+//====================================================
+// 15.03B - BUY LABEL
+//====================================================
+
+if cfg_enableRenderer and cfg_showBuyArrow
+
+    if not na(g_buyLabel)
+        label.delete(g_buyLabel)
+
+    if g_dashboardSignal == SIGNAL_BUY and not na(g_dashboardEntry)
+
+        string buyText =
+             "🟢 BUY" +
+             "\nEntry : " + str.tostring(g_dashboardEntry)
+
+        g_buyLabel := label.new(
+             bar_index,
+             low,
+             buyText,
+             style = label.style_label_up,
+             color = color.lime,
+             textcolor = color.white,
+             size = size.small)
+
+ //====================================================
+// 15.04A - SELL LABEL
+//====================================================
+
+if cfg_enableRenderer and cfg_showSellArrow
+
+    if not na(g_sellLabel)
+        label.delete(g_sellLabel)
+
+    if g_dashboardSignal == SIGNAL_SELL and not na(g_dashboardEntry)
+
+        string sellText =
+             "🔴 SELL" +
+             "\nEntry : " + str.tostring(g_dashboardEntry)
+
+        g_sellLabel := label.new(
+             bar_index,
+             high,
+             sellText,
+             style = label.style_label_down,
+             color = cfg_rendersellColor,
+             textcolor = color.white,
+             size = size.small)
+             
+//====================================================
+// 15.03C - BREAK EVEN LABEL
+//====================================================
+
+if cfg_enableRenderer and cfg_showBreakEven
+
+    if not na(g_beLabel)
+        label.delete(g_beLabel)
+
+    if not na(g_dashboardEntry) and not na(g_dashboardSL)
+
+        float bePrice = (g_dashboardEntry + g_dashboardSL) / 2.0
+
+        g_beLabel := label.new(
+             bar_index,
+             bePrice,
+             "BE",
+             style = label.style_label_left,
+             color = cfg_renderbeColor,
+             textcolor = color.white,
+             size = size.small)
+             
+//====================================================
+// 15.04 - RENDER ENGINE
+//====================================================
+
+bool rendererReady =
+     cfg_enableRenderer and
+     not na(g_dashboardEntry) and
+     g_dashboardSignal != SIGNAL_WAIT
+
+if not rendererReady
+
+    if not na(g_buyLabel)
+        label.delete(g_buyLabel)
+
+    if not na(g_sellLabel)
+        label.delete(g_sellLabel)
+
+    if not na(g_beLabel)
+        label.delete(g_beLabel)
+
+    if not na(g_entryLine)
+        line.delete(g_entryLine)
+
+    if not na(g_slLine)
+        line.delete(g_slLine)
+
+    if not na(g_tp1Line)
+        line.delete(g_tp1Line)
+
+
+//====================================================
+// MODULE 16.01 - ALERT CONFIGURATION
+// BUILD : 0.5.8
+//====================================================
+
+string GROUP_ALERT = "Alert Engine"
+
+//----------------------------------------------------
+// MASTER
+//----------------------------------------------------
+
+bool cfg_enableAlerts = input.bool(
+        true,
+        "Enable Alerts",
+        group = GROUP_ALERT)
+
+//----------------------------------------------------
+// ALERT TYPES
+//----------------------------------------------------
+
+bool cfg_alertBuy = input.bool(
+        true,
+        "BUY Alert",
+        group = GROUP_ALERT)
+
+bool cfg_alertSell = input.bool(
+        true,
+        "SELL Alert",
+        group = GROUP_ALERT)
+
+bool cfg_alertReady = input.bool(
+        true,
+        "READY Alert",
+        group = GROUP_ALERT)
+
+bool cfg_alertEntry = input.bool(
+        true,
+        "Entry Alert",
+        group = GROUP_ALERT)
+
+bool cfg_alertSL = input.bool(
+        true,
+        "Stop Loss Alert",
+        group = GROUP_ALERT)
+
+bool cfg_alertTP = input.bool(
+        true,
+        "Take Profit Alert",
+        group = GROUP_ALERT)
+
+bool cfg_alertBE = input.bool(
+        true,
+        "Break Even Alert",
+        group = GROUP_ALERT)
+
+
+//====================================================
+// MODULE 16.02 - ALERT CONDITIONS
+// BUILD : 0.5.7
+//====================================================
+
+bool alertBuy =
+     cfg_enableAlerts and
+     cfg_alertBuy and
+     g_dashboardSignal == SIGNAL_BUY
+
+bool alertSell =
+     cfg_enableAlerts and
+     cfg_alertSell and
+     g_dashboardSignal == SIGNAL_SELL
+
+bool alertReady =
+     cfg_enableAlerts and
+     cfg_alertReady and
+     g_dashboardStatus == "READY"
+
+    //====================================================
+// MODULE 16.03 - ALERT REGISTRATION
+// BUILD : 0.5.7
+//====================================================
+
+alertcondition(
+    alertBuy,
+    title = "PA-1 BUY",
+    message = "PA-1 BUY Signal")
+
+alertcondition(
+    alertSell,
+    title = "PA-1 SELL",
+    message = "PA-1 SELL Signal")
+
+alertcondition(
+    alertReady,
+    title = "PA-1 READY",
+    message = "PA-1 Trade Ready")
+
+//====================================================
+// MODULE 16.04 - RUNTIME ALERT ENGINE
+// BUILD : 0.5.7
+//====================================================
+
+if barstate.isconfirmed
+
+    if alertBuy
+        alert("🟢 PA-1 BUY Signal", alert.freq_once_per_bar_close)
+
+    if alertSell
+        alert("🔴 PA-1 SELL Signal", alert.freq_once_per_bar_close)
+
+    if alertReady
+        alert("🟡 PA-1 READY", alert.freq_once_per_bar_close)
+
+    //====================================================
+// MODULE 17.01 - TRADE MANAGER CONFIG
+// BUILD : 0.6.0
+//====================================================
+
+//-------------------------
+// Trade Lifecycle
+//-------------------------
+const int TRADE_WAIT   = 0
+const int TRADE_READY  = 1
+const int TRADE_ACTIVE = 2
+const int TRADE_BE     = 3
+const int TRADE_TP     = 4
+const int TRADE_SL     = 5
+const int TRADE_CLOSE  = 6
+
+//-------------------------
+// Runtime Variables
+//-------------------------
+var int tradeState = TRADE_WAIT
+var int tradeDirection = 0      // 1 = BUY, -1 = SELL
+
+var float tradeEntry = na
+var float tradeSL = na
+var float tradeTP = na
+
+var int tradeOpenBar = na
+var int tradeCloseBar = na
+
+var bool tradeRunning = false
+
+//--------------------------------------------------
+// SIGNAL EDGE DETECTION
+//--------------------------------------------------
+
+var string tradeLastSignal = "WAIT"
+var bool tradeNewSignal = false
+
+//====================================================
+// MODULE 17.02 - TRADE STATE ENGINE
+// BUILD : 0.6.0
+//====================================================
+
+//--------------------------------------------------
+// SIGNAL EDGE DETECTION
+//--------------------------------------------------
+
+tradeNewSignal := false
+
+if g_dashboardSignal != tradeLastSignal
+
+    if g_dashboardSignal == SIGNAL_BUY or
+       g_dashboardSignal == SIGNAL_SELL
+
+        tradeNewSignal := true
+
+    tradeLastSignal := g_dashboardSignal
+
+//--------------------------------------------------
+// READY STATE
+//--------------------------------------------------
+
+if not tradeRunning and tradeNewSignal
+
+    tradeState := TRADE_READY
+
+    if g_dashboardSignal == SIGNAL_BUY
+        g_tradeState := TS_BUY_READY
+    else if g_dashboardSignal == SIGNAL_SELL
+        g_tradeState := TS_SELL_READY
+    else
+        g_tradeState := TS_WAIT
+
+///-------------------------
+// Direction
+//-------------------------
+
+if tradeRunning or tradeState == TRADE_READY
+    tradeDirection := g_dashboardSignal == SIGNAL_BUY ? DIR_LONG : DIR_SHORT
+
+//-------------------------
+// ACTIVE State
+//-------------------------
+
+if tradeState == TRADE_READY and barstate.isconfirmed
+
+    tradeState := TRADE_ACTIVE
+    tradeRunning := true
+
+    if tradeDirection == DIR_LONG
+        g_tradeState := TS_BUY_ACTIVE
+    else if tradeDirection == DIR_SHORT
+        g_tradeState := TS_SELL_ACTIVE
+
+//======================================================================
+// MODULE 17.03 - TRADE SNAPSHOT ENGINE
+// BUILD : 0.6.1
+//======================================================================
+
+//--------------------------------------------------
+// SNAPSHOT VARIABLES
+//--------------------------------------------------
+
+var bool tradeSnapshotTaken = false
+
+var float snapEntry = na
+var float snapSL = na
+var float snapTP = na
+
+var int snapDirection = 0
+
+var int snapOpenBar = na
+var int snapOpenTime = na
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+if not tradeRunning
+
+    tradeSnapshotTaken := false
+
+    snapEntry := na
+    snapSL := na
+    snapTP := na
+
+    snapDirection := 0
+
+    snapOpenBar := na
+    snapOpenTime := na
+
+//--------------------------------------------------
+// SNAPSHOT ENGINE
+//--------------------------------------------------
+
+if tradeRunning and not tradeSnapshotTaken
+
+    snapEntry := g_dashboardEntry
+    snapSL := g_dashboardSL
+    snapTP := g_dashboardTP
+
+    snapDirection := tradeDirection
+
+    snapOpenBar := bar_index
+    snapOpenTime := time
+
+    tradeEntry := snapEntry
+    tradeSL := snapSL
+    tradeTP := snapTP
+
+    tradeOpenBar := snapOpenBar
+
+    tradeSnapshotTaken := true
+
+//--------------------------------------------------
+// VALIDATION
+//--------------------------------------------------
+
+bool snapshotReady =
+     tradeSnapshotTaken and
+     not na(snapEntry) and
+     not na(snapSL) and
+     not na(snapTP)
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_debugMode and barstate.islast
+
+    label.new(
+         bar_index,
+         low,
+         "===== MODULE 17.03 =====" +
+         "\nSnapshot : " + str.tostring(tradeSnapshotTaken) +
+         "\nEntry : " + str.tostring(snapEntry) +
+         "\nSL : " + str.tostring(snapSL) +
+         "\nTP : " + str.tostring(snapTP) +
+         "\nDirection : " + str.tostring(snapDirection) +
+         "\nOpen Bar : " + str.tostring(snapOpenBar),
+         style = label.style_label_up,
+         color = color.new(color.green, 75),
+         textcolor = color.white,
+         size = size.small)
+
+//======================================================================
+// MODULE 17.04 - TRADE TRACKING ENGINE
+// BUILD : 0.6.2
+//======================================================================
+
+//--------------------------------------------------
+// TRACKING VARIABLES
+//--------------------------------------------------
+
+var int tradeBars = 0
+
+var float tradeHighest = na
+var float tradeLowest = na
+
+var float tradeMFE = 0.0
+var float tradeMAE = 0.0
+
+var float tradeFloating = 0.0
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+if not tradeRunning
+
+    tradeBars := 0
+
+    tradeHighest := na
+    tradeLowest := na
+
+    tradeMFE := 0.0
+    tradeMAE := 0.0
+
+    tradeFloating := 0.0
+
+//--------------------------------------------------
+// TRACKING ENGINE
+//--------------------------------------------------
+
+if tradeRunning and tradeSnapshotTaken
+
+    //----------------------------------------------
+    // Bars in Trade
+    //----------------------------------------------
+
+    tradeBars := bar_index - tradeOpenBar
+
+    //----------------------------------------------
+    // Highest / Lowest Since Entry
+    //----------------------------------------------
+
+    if na(tradeHighest)
+
+        tradeHighest := high
+
+    else
+
+        tradeHighest := math.max(
+            tradeHighest,
+            high)
+
+    if na(tradeLowest)
+
+        tradeLowest := low
+
+    else
+
+        tradeLowest := math.min(
+            tradeLowest,
+            low)
+
+    //----------------------------------------------
+    // LONG TRADE
+    //----------------------------------------------
+
+    if tradeDirection == DIR_LONG
+
+        tradeFloating :=
+             close - tradeEntry
+
+        tradeMFE :=
+             tradeHighest - tradeEntry
+
+        tradeMAE :=
+             tradeEntry - tradeLowest
+
+    //----------------------------------------------
+    // SHORT TRADE
+    //----------------------------------------------
+
+    else if tradeDirection == DIR_SHORT
+
+        tradeFloating :=
+             tradeEntry - close
+
+        tradeMFE :=
+             tradeEntry - tradeLowest
+
+        tradeMAE :=
+             tradeHighest - tradeEntry
+
+//--------------------------------------------------
+// VALIDATION
+//--------------------------------------------------
+
+bool trackingReady =
+     tradeRunning and
+     tradeSnapshotTaken
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_debugMode and
+   barstate.islast and
+   trackingReady
+
+    label.new(
+
+         bar_index,
+
+         high,
+
+         "===== MODULE 17.04 =====" +
+
+         "\nBars : " + str.tostring(tradeBars) +
+
+         "\nFloating : " + str.tostring(tradeFloating) +
+
+         "\nMFE : " + str.tostring(tradeMFE) +
+
+         "\nMAE : " + str.tostring(tradeMAE) +
+
+         "\nHigh : " + str.tostring(tradeHighest) +
+
+         "\nLow : " + str.tostring(tradeLowest),
+
+         style = label.style_label_left,
+
+         color = color.new(color.purple,70),
+
+         textcolor = color.white,
+
+         size = size.small)
+
+ //======================================================================
+// MODULE 17.05 - EXIT ENGINE
+// BUILD : 0.6.3
+//======================================================================
+
+//--------------------------------------------------
+// EXIT VARIABLES
+//--------------------------------------------------
+
+var bool tradeExit = false
+
+var string tradeExitReason = "NONE"
+
+var float tradeExitPrice = na
+
+var int tradeExitBar = na
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+if not tradeRunning
+
+    tradeExit := false
+    tradeExitReason := "NONE"
+    tradeExitPrice := na
+    tradeExitBar := na
+
+//--------------------------------------------------
+// EXIT ENGINE
+//--------------------------------------------------
+
+if tradeRunning and tradeSnapshotTaken
+
+    //------------------------------------------
+    // LONG
+    //------------------------------------------
+
+    if tradeDirection == DIR_LONG
+
+        if low <= tradeSL
+
+            tradeExit := true
+            tradeExitReason := "STOP LOSS"
+            tradeExitPrice := tradeSL
+
+        else if high >= tradeTP
+
+            tradeExit := true
+            tradeExitReason := "TAKE PROFIT"
+            tradeExitPrice := tradeTP
+
+    //------------------------------------------
+    // SHORT
+    //------------------------------------------
+
+    else if tradeDirection == DIR_SHORT
+
+        if high >= tradeSL
+
+            tradeExit := true
+            tradeExitReason := "STOP LOSS"
+            tradeExitPrice := tradeSL
+
+        else if low <= tradeTP
+
+            tradeExit := true
+            tradeExitReason := "TAKE PROFIT"
+            tradeExitPrice := tradeTP
+
+//--------------------------------------------------
+// CLOSE TRADE
+//--------------------------------------------------
+
+if tradeExit
+
+    tradeCloseBar := bar_index
+    tradeRunning := false
+    tradeState := TRADE_CLOSE
+    tradeNewSignal := false
+
+    if tradeExitReason == "TAKE PROFIT"
+        g_tradeState := TS_TP_HIT
+    else if tradeExitReason == "STOP LOSS"
+        g_tradeState := TS_SL_HIT
+    else
+        g_tradeState := TS_WAIT
+
+    tradeExitBar := bar_index
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_debugMode and
+   barstate.islast
+
+    label.new(
+
+        bar_index,
+
+        high,
+
+        "===== MODULE 17.05 =====" +
+
+        "\nRunning : " + str.tostring(tradeRunning) +
+
+        "\nExit : " + str.tostring(tradeExit) +
+
+        "\nReason : " + tradeExitReason +
+
+        "\nExit Price : " + str.tostring(tradeExitPrice),
+
+        style = label.style_label_left,
+
+        color = color.new(color.red,70),
+
+        textcolor = color.white,
+
+        size = size.small)
+
+//======================================================================
+// MODULE 17.06 - STATISTICS ENGINE
+// BUILD : 0.6.4
+//======================================================================
+
+//--------------------------------------------------
+// STATISTICS
+//--------------------------------------------------
+
+var int statTotalTrades = 0
+var int statWins = 0
+var int statLosses = 0
+var int statBreakEven = 0
+
+var float statWinRate = 0.0
+
+//--------------------------------------------------
+// UPDATE
+//--------------------------------------------------
+
+if tradeExit
+
+    statTotalTrades += 1
+
+    if tradeExitReason == "TAKE PROFIT"
+
+        statWins += 1
+
+    else if tradeExitReason == "STOP LOSS"
+
+        statLosses += 1
+
+    else
+
+        statBreakEven += 1
+
+//--------------------------------------------------
+// WIN RATE
+//--------------------------------------------------
+
+if statTotalTrades > 0
+
+    statWinRate := (float(statWins) /
+        float(statTotalTrades)) * 100.0
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_debugMode and barstate.islast
+
+    label.new(
+
+        bar_index,
+
+        high,
+
+        "===== MODULE 17.06 =====" +
+
+        "\nTrades : " + str.tostring(statTotalTrades) +
+
+        "\nWins : " + str.tostring(statWins) +
+
+        "\nLosses : " + str.tostring(statLosses) +
+
+        "\nBreakEven : " + str.tostring(statBreakEven) +
+
+        "\nWinRate : " + str.tostring(statWinRate,"#.00")+"%",
+
+        style = label.style_label_left,
+
+        color = color.new(color.green,70),
+
+        textcolor = color.white,
+
+        size = size.small)
+
+//======================================================================
+// MODULE 18.01 - DECISION ENGINE CONFIGURATION
+// BUILD : 0.7.0 ALPHA
+//======================================================================
+
+string GROUP_DECISION = "Decision Engine"
+
+//--------------------------------------------------
+// ENABLE
+//--------------------------------------------------
+
+bool cfg_enableDecisionEngine = input.bool(
+    true,
+    "Enable Decision Engine",
+    group = GROUP_DECISION)
+
+//--------------------------------------------------
+// DECISION PROFILE
+//--------------------------------------------------
+
+string cfg_decisionProfile = input.string(
+    "Professional",
+    "Decision Profile",
+    options = [
+        "Beginner",
+        "Scalper",
+        "Professional",
+        "Sniper",
+        "Custom"
+    ],
+    group = GROUP_DECISION)
+
+//--------------------------------------------------
+// DECISION FILTER
+//--------------------------------------------------
+
+bool cfg_enableDecisionFilter = input.bool(
+    true,
+    "Enable Decision Filter",
+    group = GROUP_DECISION)
+
+int cfg_decisionFilter = input.int(
+    90,
+    "Filter Level (%)",
+    minval = 50,
+    maxval = 100,
+    step = 5,
+    group = GROUP_DECISION)
+
+//--------------------------------------------------
+// ADAPTIVE MARKET MODE
+//--------------------------------------------------
+
+bool cfg_enableAdaptiveMode = input.bool(
+    true,
+    "Enable Adaptive Market Mode",
+    group = GROUP_DECISION)
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+bool cfg_showDecisionDebug = input.bool(
+    false,
+    "Debug Decision Engine",
+    group = GROUP_DECISION)
+
+//======================================================================
+// MODULE 18.02 - DECISION PROFILE SYSTEM
+// BUILD : 0.7.1 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// PROFILE VARIABLES
+//--------------------------------------------------
+
+int e_profileFilter = cfg_decisionFilter
+
+bool e_profileAdaptive = cfg_enableAdaptiveMode
+
+//--------------------------------------------------
+// PROFILE ENGINE
+//--------------------------------------------------
+
+if cfg_decisionProfile == "Beginner"
+
+    e_profileFilter := 70
+    e_profileAdaptive := true
+
+else if cfg_decisionProfile == "Scalper"
+
+    e_profileFilter := 80
+    e_profileAdaptive := true
+
+else if cfg_decisionProfile == "Professional"
+
+    e_profileFilter := 90
+    e_profileAdaptive := true
+
+else if cfg_decisionProfile == "Sniper"
+
+    e_profileFilter := 100
+    e_profileAdaptive := true
+
+else
+
+    // Custom
+    e_profileFilter := cfg_decisionFilter
+    e_profileAdaptive := cfg_enableAdaptiveMode
+
+//======================================================================
+// MODULE 18.03 - MANDATORY GATE ENGINE
+// BUILD : 0.7.2 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// GATE STATUS
+//--------------------------------------------------
+
+bool gateHTF = false
+bool gateStructure = false
+bool gateRisk = false
+
+//--------------------------------------------------
+// HTF GATE
+//--------------------------------------------------
+
+gateHTF :=
+     not cfg_enableHTFFilter or
+     e_htfReady
+
+//--------------------------------------------------
+// STRUCTURE GATE
+//--------------------------------------------------
+
+gateStructure :=
+     not cfg_enableStructureFilter or
+     e_structureReady
+
+//--------------------------------------------------
+// RISK GATE
+//--------------------------------------------------
+
+gateRisk :=
+     not cfg_enableRisk or
+     rm_ready
+
+//--------------------------------------------------
+// FINAL GATE
+//--------------------------------------------------
+
+bool e_mandatoryGatePassed =
+     gateHTF and
+     gateStructure and
+     gateRisk
+
+//======================================================================
+// MODULE 18.04 - ENGINE WEIGHT SYSTEM
+// BUILD : 0.7.3 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// ENGINE WEIGHTS
+//--------------------------------------------------
+
+int WEIGHT_HTF        = 20
+int WEIGHT_STRUCTURE  = 20
+int WEIGHT_LIQUIDITY  = 15
+int WEIGHT_PD         = 10
+int WEIGHT_OB         = 15
+int WEIGHT_MITIGATION = 10
+int WEIGHT_EVIDENCE   = 10
+
+//--------------------------------------------------
+// SCORE
+//--------------------------------------------------
+
+int e_weightScore = 0
+
+e_weightScore := 0
+
+//--------------------------------------------------
+// HTF
+//--------------------------------------------------
+
+if e_htfReady
+    e_weightScore += WEIGHT_HTF
+
+//--------------------------------------------------
+// STRUCTURE
+//--------------------------------------------------
+
+if e_structureReady
+    e_weightScore += WEIGHT_STRUCTURE
+
+//--------------------------------------------------
+// LIQUIDITY
+//--------------------------------------------------
+
+if e_liquidityReady
+    e_weightScore += WEIGHT_LIQUIDITY
+
+//--------------------------------------------------
+// PREMIUM / DISCOUNT
+//--------------------------------------------------
+
+if e_pdStrong
+    e_weightScore += WEIGHT_PD
+
+//--------------------------------------------------
+// ORDER BLOCK
+//--------------------------------------------------
+
+if e_obReady
+    e_weightScore += WEIGHT_OB
+
+//--------------------------------------------------
+// MITIGATION
+//--------------------------------------------------
+
+if e_mitigationReady
+    e_weightScore += WEIGHT_MITIGATION
+
+//--------------------------------------------------
+// EVIDENCE
+//--------------------------------------------------
+
+if e_evidenceReady
+    e_weightScore += WEIGHT_EVIDENCE
+
+//--------------------------------------------------
+// LIMITER
+//--------------------------------------------------
+
+e_weightScore := math.min(100, e_weightScore)
+
+//======================================================================
+// MODULE 18.05 - DECISION FILTER ENGINE
+// BUILD : 0.7.4 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// VARIABLES
+//--------------------------------------------------
+
+bool e_filterPassed = false
+
+string e_filterReason = ""
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+e_filterPassed := false
+e_filterReason := "NO TRADE"
+
+//--------------------------------------------------
+// DECISION FILTER
+//--------------------------------------------------
+
+if not cfg_enableDecisionEngine
+
+    e_filterPassed := true
+    e_filterReason := "ENGINE DISABLED"
+
+else if not e_mandatoryGatePassed
+
+    e_filterPassed := false
+    e_filterReason := "MANDATORY GATE FAILED"
+
+else if not cfg_enableDecisionFilter
+
+    e_filterPassed := true
+    e_filterReason := "FILTER DISABLED"
+
+else if e_weightScore >= e_profileFilter
+
+    e_filterPassed := true
+    e_filterReason := "FILTER PASSED"
+
+else
+
+    e_filterPassed := false
+    e_filterReason := "LOW DECISION SCORE"
+
+//======================================================================
+// MODULE 18.06 - ADAPTIVE MARKET MODE
+// BUILD : 0.7.5 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// MARKET MODE CONSTANTS
+//--------------------------------------------------
+
+string MM_TRENDING  = "TRENDING"
+string MM_RANGING   = "RANGING"
+string MM_VOLATILE  = "VOLATILE"
+string MM_UNKNOWN   = "UNKNOWN"
+
+//--------------------------------------------------
+// OUTPUT
+//--------------------------------------------------
+
+string e_marketMode = MM_UNKNOWN
+
+//--------------------------------------------------
+// ENGINE
+//--------------------------------------------------
+
+if not e_profileAdaptive
+
+    e_marketMode := MM_UNKNOWN
+
+else
+
+    if e_marketVolatile
+
+        e_marketMode := MM_VOLATILE
+
+    else if e_marketTrending
+
+        e_marketMode := MM_TRENDING
+
+    else if e_marketCompression
+
+        e_marketMode := MM_RANGING
+
+    else
+
+        e_marketMode := MM_UNKNOWN
+
+    //======================================================================
+// MODULE 18.07 - FINAL DECISION ENGINE
+// BUILD : 0.7.6 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// OUTPUT
+//--------------------------------------------------
+
+string e_decisionSignal = SIGNAL_NO_TRADE
+string e_decisionStatus = "NO TRADE"
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+e_decisionSignal := SIGNAL_NO_TRADE
+e_decisionStatus := "WAIT"
+
+//--------------------------------------------------
+// FINAL DECISION
+//--------------------------------------------------
+
+if cfg_enableDecisionEngine
+
+    if not e_filterPassed
+
+        e_decisionSignal := SIGNAL_NO_TRADE
+        e_decisionStatus := e_filterReason
+
+    else
+
+        if e_marketBias == BIAS_BULL
+
+            e_decisionSignal := SIGNAL_BUY
+            e_decisionStatus := "BUY"
+
+        else if e_marketBias == BIAS_BEAR
+
+            e_decisionSignal := SIGNAL_SELL
+            e_decisionStatus := "SELL"
+
+        else
+
+            e_decisionSignal := SIGNAL_WAIT
+            e_decisionStatus := "WAIT"
+
+//======================================================================
+// MODULE 18.07A - SIGNAL SYNCHRONIZATION ENGINE
+// BUILD : 0.7.6
+//======================================================================
+
+//--------------------------------------------------
+// SINGLE SOURCE OF TRUTH
+//--------------------------------------------------
+
+if barstate.isconfirmed
+
+    g_signal := e_decisionSignal
+
+    g_signalBar := bar_index
+
+//======================================================================
+// MODULE 18.08 - DASHBOARD INTEGRATION
+// BUILD : 0.7.7 ALPHA
+//======================================================================
+
+//--------------------------------------------------
+// DASHBOARD SYNC
+//--------------------------------------------------
+
+if cfg_enableDecisionEngine
+
+    g_dashboardSignal := g_signal
+    g_dashboardStatus := e_decisionStatus
+
+//--------------------------------------------------
+// DEBUG
+//--------------------------------------------------
+
+if cfg_showDecisionDebug
+
+    label.new(
+         bar_index,
+         high,
+         "Decision : " + e_decisionStatus +
+         "\nScore : " + str.tostring(e_weightScore) +
+         "\nMode : " + e_marketMode,
+         style = label.style_label_down,
+         textcolor = color.white,
+         color = color.new(color.blue, 60),
+         size = size.tiny)
+         
+//======================================================
+// MODULE 19.01
+// STATE VALIDATION
+//======================================================
+
+var string ts_prevState   = ""
+var bool   ts_hasChanged  = false
+var bool   ts_isValid     = true
+
+//======================================================
+// MODULE 19.02
+// STATE TRANSITION ENGINE
+//======================================================
+
+// Save previous state
+if ts_hasChanged
+    ts_prevState := g_tradeState
+
+//------------------------------------------------------
+// Transition Validation
+//------------------------------------------------------
+bool ts_transitionOK = true
+
+switch g_tradeState
+
+    TS_NO_TRADE =>
+        ts_transitionOK := true
+
+    TS_WAIT =>
+        ts_transitionOK := true
+
+    TS_BUY_READY =>
+        ts_transitionOK := ts_prevState == TS_WAIT or
+                           ts_prevState == TS_NO_TRADE
+
+    TS_SELL_READY =>
+        ts_transitionOK := ts_prevState == TS_WAIT or
+                           ts_prevState == TS_NO_TRADE
+
+    TS_BUY_ACTIVE =>
+        ts_transitionOK := ts_prevState == TS_BUY_READY
+
+    TS_SELL_ACTIVE =>
+        ts_transitionOK := ts_prevState == TS_SELL_READY
+
+    TS_BREAK_EVEN =>
+        ts_transitionOK := ts_prevState == TS_BUY_ACTIVE or
+                           ts_prevState == TS_SELL_ACTIVE
+
+    TS_TP_HIT =>
+        ts_transitionOK := ts_prevState == TS_BREAK_EVEN or
+                           ts_prevState == TS_BUY_ACTIVE or
+                           ts_prevState == TS_SELL_ACTIVE
+
+    TS_SL_HIT =>
+        ts_transitionOK := true
+
+    //======================================================================
+// MODULE 19.03 - STATE INTEGRITY MONITOR
+//======================================================================
+
+//--------------------------------------------------
+// Integrity Flags
+//--------------------------------------------------
+var bool ts_integrityOK      = true
+var bool ts_signalMismatch   = false
+var bool ts_directionMismatch = false
+
+//--------------------------------------------------
+// Reset
+//--------------------------------------------------
+ts_integrityOK       := true
+ts_signalMismatch    := false
+ts_directionMismatch := false
+
+//--------------------------------------------------
+// Signal ↔ Trade State Validation
+//--------------------------------------------------
+if g_tradeState == TS_BUY_READY and g_signal != SIGNAL_BUY
+    ts_signalMismatch := true
+
+if g_tradeState == TS_SELL_READY and g_signal != SIGNAL_SELL
+    ts_signalMismatch := true
+
+//--------------------------------------------------
+// Direction ↔ Trade State Validation
+//--------------------------------------------------
+if g_tradeState == TS_BUY_ACTIVE and ex_direction != DIR_LONG
+    ts_directionMismatch := true
+
+if g_tradeState == TS_SELL_ACTIVE and ex_direction != DIR_SHORT
+    ts_directionMismatch := true
+
+//--------------------------------------------------
+// Final Integrity Status
+//--------------------------------------------------
+ts_integrityOK :=
+     not ts_signalMismatch and
+     not ts_directionMismatch
+
+//======================================================================
+// MODULE 19.04 - STATE PROTECTION ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Protection Variables
+//--------------------------------------------------
+var int    ts_lastStateBar = na
+var string ts_lastState    = ""
+
+//--------------------------------------------------
+// State Change Detection
+//--------------------------------------------------
+bool ts_newState =
+     g_tradeState != ts_lastState
+
+//--------------------------------------------------
+// Update State
+//--------------------------------------------------
+if ts_newState
+
+    ts_lastState    := g_tradeState
+    ts_lastStateBar := bar_index
+
+//--------------------------------------------------
+// Protection Flag
+//--------------------------------------------------
+bool ts_sameBarUpdate =
+     ts_lastStateBar == bar_index and
+     not ts_newState
+
+//--------------------------------------------------
+// Final Protection
+//--------------------------------------------------
+bool ts_stateProtected =
+     not ts_sameBarUpdate
+
+//======================================================================
+// MODULE 19.05 - STATE TIMEOUT ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Timeout Configuration
+//--------------------------------------------------
+int ts_timeoutBars = 15
+
+//--------------------------------------------------
+// State Age
+//--------------------------------------------------
+int ts_stateAge = na(ts_lastStateBar) ? 0 : bar_index - ts_lastStateBar
+
+//--------------------------------------------------
+// Timeout Detection
+//--------------------------------------------------
+bool ts_timeout =
+     ts_stateAge >= ts_timeoutBars
+
+//--------------------------------------------------
+// Timeout Applies Only To Ready States
+//--------------------------------------------------
+bool ts_timeoutActive =
+     ts_timeout and
+     (g_tradeState == TS_BUY_READY or
+      g_tradeState == TS_SELL_READY)
+
+//======================================================================
+// MODULE 19.06 - DUPLICATE SIGNAL FILTER
+//======================================================================
+
+//--------------------------------------------------
+// Last Accepted Signal
+//--------------------------------------------------
+var string ts_lastAcceptedState = ""
+var int    ts_lastAcceptedBar   = na
+
+//--------------------------------------------------
+// Duplicate Detection
+//--------------------------------------------------
+bool ts_duplicateState =
+     g_tradeState == ts_lastAcceptedState and
+     ts_lastAcceptedBar == bar_index
+
+//--------------------------------------------------
+// Accept New State
+//--------------------------------------------------
+bool ts_acceptState = not ts_duplicateState
+
+if ts_acceptState
+    ts_lastAcceptedState := g_tradeState
+    ts_lastAcceptedBar   := bar_index
+
+//======================================================================
+// MODULE 19.07 - DASHBOARD HOOK ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Dashboard Status
+//--------------------------------------------------
+string ts_dashboardState      = g_tradeState
+bool   ts_dashboardIntegrity  = ts_integrityOK
+bool   ts_dashboardProtected  = ts_stateProtected
+bool   ts_dashboardTimeout    = ts_timeoutActive
+bool   ts_dashboardDuplicate  = ts_duplicateState
+
+//--------------------------------------------------
+// Dashboard Summary
+//--------------------------------------------------
+string ts_dashboardHealth =
+     ts_dashboardIntegrity and
+     ts_dashboardProtected and
+     not ts_dashboardTimeout and
+     not ts_dashboardDuplicate ?
+     "OK" : "CHECK"
+
+//======================================================================
+// MODULE 19.08 - MODULE API ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Public API
+//--------------------------------------------------
+bool   m19_stateValid      = ts_isValid
+bool   m19_transitionOK    = ts_transitionOK
+bool   m19_integrityOK     = ts_integrityOK
+bool   m19_stateProtected  = ts_stateProtected
+bool   m19_timeoutActive   = ts_timeoutActive
+bool   m19_duplicateState  = ts_duplicateState
+
+string m19_tradeState      = g_tradeState
+string m19_previousState   = ts_prevState
+
+//--------------------------------------------------
+// Overall Health
+//--------------------------------------------------
+bool m19_engineHealthy =
+     m19_stateValid and
+     m19_transitionOK and
+     m19_integrityOK and
+     m19_stateProtected and
+     not m19_timeoutActive and
+     not m19_duplicateState
+     
+//======================================================================
+// MODULE 20.01 - TRADE LIFECYCLE INITIALIZATION
+//======================================================================
+
+//--------------------------------------------------
+// Lifecycle Status
+//--------------------------------------------------
+const string LC_IDLE      = "IDLE"
+const string LC_READY     = "READY"
+const string LC_ACTIVE    = "ACTIVE"
+const string LC_BREAKEVEN = "BREAKEVEN"
+const string LC_EXITED    = "EXITED"
+
+//--------------------------------------------------
+// Lifecycle Variables
+//--------------------------------------------------
+var string lc_state      = LC_IDLE
+var int    lc_entryBar   = na
+var int    lc_exitBar    = na
+var int    lc_tradeBars  = 0
+
+//--------------------------------------------------
+// Lifecycle Reset
+//--------------------------------------------------
+if lc_state == LC_IDLE
+    lc_tradeBars := 0
+
+//--------------------------------------------------
+// Active Trade Duration
+//--------------------------------------------------
+if lc_state == LC_ACTIVE or lc_state == LC_BREAKEVEN
+    lc_tradeBars := bar_index - lc_entryBar
+
+//======================================================================
+// MODULE 20.02 - ENTRY REGISTRATION ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Entry Detection
+//--------------------------------------------------
+bool lc_newEntry =
+     m19_engineHealthy and
+     (g_tradeState == TS_BUY_ACTIVE or
+      g_tradeState == TS_SELL_ACTIVE) and
+     lc_state != LC_ACTIVE
+
+//--------------------------------------------------
+// Register Entry
+//--------------------------------------------------
+if lc_newEntry
+
+    lc_state     := LC_ACTIVE
+    lc_entryBar  := bar_index
+    lc_exitBar   := na
+    lc_tradeBars := 0
+
+//======================================================================
+// MODULE 20.03 - ACTIVE TRADE MONITOR
+//======================================================================
+
+//--------------------------------------------------
+// Active Trade Status
+//--------------------------------------------------
+bool lc_isActive =
+     lc_state == LC_ACTIVE or
+     lc_state == LC_BREAKEVEN
+
+//--------------------------------------------------
+// Trade Duration
+//--------------------------------------------------
+if lc_isActive and not na(lc_entryBar)
+    lc_tradeBars := bar_index - lc_entryBar
+
+//--------------------------------------------------
+// Active Direction
+//--------------------------------------------------
+string lc_direction =
+     g_tradeState == TS_BUY_ACTIVE  ? "BUY" :
+     g_tradeState == TS_SELL_ACTIVE ? "SELL" :
+     "NONE"
+
+//======================================================================
+// MODULE 20.04 - BREAK-EVEN MANAGER
+//======================================================================
+
+//--------------------------------------------------
+// Break-even Status
+//--------------------------------------------------
+bool lc_breakEven =
+     g_tradeState == TS_BREAK_EVEN
+
+//--------------------------------------------------
+// Lifecycle Update
+//--------------------------------------------------
+if lc_breakEven
+    lc_state := LC_BREAKEVEN
+
+//--------------------------------------------------
+// Break-even Bar
+//--------------------------------------------------
+var int lc_breakEvenBar = na
+
+if lc_breakEven and na(lc_breakEvenBar)
+    lc_breakEvenBar := bar_index
+
+if lc_state == LC_IDLE
+    lc_breakEvenBar := na
+
+//======================================================================
+// MODULE 20.05 - PARTIAL TAKE PROFIT MANAGER
+//======================================================================
+
+//--------------------------------------------------
+// Partial TP Status
+//--------------------------------------------------
+bool lc_partialTP =
+     g_tradeState == TS_BREAK_EVEN
+
+//--------------------------------------------------
+// Partial TP Bar
+//--------------------------------------------------
+var int lc_partialTPBar = na
+
+if lc_partialTP and na(lc_partialTPBar)
+    lc_partialTPBar := bar_index
+
+//--------------------------------------------------
+// Reset
+//--------------------------------------------------
+if lc_state == LC_IDLE
+    lc_partialTPBar := na
+
+//======================================================================
+// MODULE 20.06 - TRAILING STOP MANAGER
+//======================================================================
+
+//--------------------------------------------------
+// Trailing Stop Status
+//--------------------------------------------------
+bool lc_trailingActive =
+     lc_state == LC_BREAKEVEN
+
+//--------------------------------------------------
+// Trailing Start Bar
+//--------------------------------------------------
+var int lc_trailingBar = na
+
+if lc_trailingActive and na(lc_trailingBar)
+    lc_trailingBar := bar_index
+
+//--------------------------------------------------
+// Reset
+//--------------------------------------------------
+if lc_state == LC_IDLE
+    lc_trailingBar := na
+
+//======================================================================
+// MODULE 20.07 - EXIT SUMMARY ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Exit Detection
+//--------------------------------------------------
+bool lc_tradeClosed =
+     g_tradeState == TS_TP_HIT or
+     g_tradeState == TS_SL_HIT
+
+//--------------------------------------------------
+// Register Exit
+//--------------------------------------------------
+if lc_tradeClosed
+
+    lc_exitBar := bar_index
+    lc_state   := LC_EXITED
+
+//--------------------------------------------------
+// Trade Duration
+//--------------------------------------------------
+int lc_totalBars = not na(lc_entryBar) and not na(lc_exitBar) ? lc_exitBar - lc_entryBar : 0
+
+//======================================================================
+// MODULE 20.08 - PUBLIC API ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Public API
+//--------------------------------------------------
+string m20_lifecycleState = lc_state
+
+bool   m20_isActive       = lc_isActive
+bool   m20_breakEven      = lc_breakEven
+bool   m20_partialTP      = lc_partialTP
+bool   m20_trailingActive = lc_trailingActive
+bool   m20_tradeClosed    = lc_tradeClosed
+
+int    m20_tradeBars      = lc_tradeBars
+int    m20_totalBars      = lc_totalBars
+
+//--------------------------------------------------
+// Engine Health
+//--------------------------------------------------
+bool m20_engineHealthy =
+     m19_engineHealthy and
+     not na(lc_entryBar)
+
+//======================================================================
+// MODULE 21.01 - PERFORMANCE INITIALIZATION
+//======================================================================
+
+//--------------------------------------------------
+// Performance Variables
+//--------------------------------------------------
+var int   pf_totalTrades = 0
+var int   pf_totalWins   = 0
+var int   pf_totalLosses = 0
+
+var float pf_winRate     = 0.0
+var float pf_score       = 0.0
+
+//--------------------------------------------------
+// Engine Ready
+//--------------------------------------------------
+bool pf_engineReady =
+     m20_engineHealthy
+     
+//======================================================================
+// MODULE 21.02 - TRADE COUNTER
+//======================================================================
+
+//--------------------------------------------------
+// Trade Close Detection
+//--------------------------------------------------
+bool pf_newTrade =
+     lc_tradeClosed and
+     barstate.isconfirmed
+
+//--------------------------------------------------
+// Prevent Double Count
+//--------------------------------------------------
+var int pf_lastCountBar = na
+
+if pf_newTrade and pf_lastCountBar != bar_index
+    pf_totalTrades += 1
+    pf_lastCountBar := bar_index
+    
+ //======================================================================
+// MODULE 21.03 - WIN / LOSS COUNTER
+//======================================================================
+
+//--------------------------------------------------
+// Trade Result
+//--------------------------------------------------
+bool pf_isWin  = g_tradeState == TS_TP_HIT
+bool pf_isLoss = g_tradeState == TS_SL_HIT
+
+//--------------------------------------------------
+// Prevent Double Count
+//--------------------------------------------------
+var int pf_lastResultBar = na
+
+if lc_tradeClosed and pf_lastResultBar != bar_index
+
+    if pf_isWin
+        pf_totalWins += 1
+
+    if pf_isLoss
+        pf_totalLosses += 1
+
+    pf_lastResultBar := bar_index
+
+ //======================================================================
+// MODULE 21.04 - WIN RATE CALCULATOR
+//======================================================================
+
+//--------------------------------------------------
+// Win Rate
+//--------------------------------------------------
+if pf_totalTrades > 0
+    pf_winRate := (pf_totalWins * 100.0) / pf_totalTrades
+else
+    pf_winRate := 0.0
+
+//--------------------------------------------------
+// Trade Balance
+//--------------------------------------------------
+int pf_netWins = pf_totalWins - pf_totalLosses
+
+//======================================================================
+// MODULE 21.05 - AVERAGE TRADE DURATION
+//======================================================================
+
+//--------------------------------------------------
+// Total Trade Bars
+//--------------------------------------------------
+var int pf_totalTradeBars = 0
+
+//--------------------------------------------------
+// Accumulate Duration
+//--------------------------------------------------
+if lc_tradeClosed and barstate.isconfirmed
+    pf_totalTradeBars += lc_totalBars
+
+//--------------------------------------------------
+// Average Duration
+//--------------------------------------------------
+float pf_avgTradeBars = 0.0
+
+if pf_totalTrades > 0
+    pf_avgTradeBars := pf_totalTradeBars / pf_totalTrades
+
+//======================================================================
+// MODULE 21.06 - PERFORMANCE SCORE ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Performance Score
+//--------------------------------------------------
+if pf_winRate >= 80
+    pf_score := 100
+else if pf_winRate >= 70
+    pf_score := 90
+else if pf_winRate >= 60
+    pf_score := 80
+else if pf_winRate >= 50
+    pf_score := 70
+else if pf_winRate >= 40
+    pf_score := 60
+else
+    pf_score := 50
+
+//--------------------------------------------------
+// Performance Grade
+//--------------------------------------------------
+string pf_grade =
+     pf_score >= 95 ? "A+" :
+     pf_score >= 90 ? "A"  :
+     pf_score >= 80 ? "B"  :
+     pf_score >= 70 ? "C"  :
+     "D"
+
+//======================================================================
+// MODULE 21.07 - DASHBOARD ANALYTICS ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Dashboard Analytics
+//--------------------------------------------------
+string pf_dashboardTrades =
+     str.tostring(pf_totalTrades)
+
+string pf_dashboardWins =
+     str.tostring(pf_totalWins)
+
+string pf_dashboardLosses =
+     str.tostring(pf_totalLosses)
+
+string pf_dashboardWinRate =
+     str.tostring(math.round(pf_winRate, 2)) + "%"
+
+string pf_dashboardScore =
+     str.tostring(pf_score)
+
+string pf_dashboardGrade =
+     pf_grade
+
+//======================================================================
+// MODULE 21.08 - PUBLIC API ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Public API
+//--------------------------------------------------
+int    m21_totalTrades    = pf_totalTrades
+int    m21_totalWins      = pf_totalWins
+int    m21_totalLosses    = pf_totalLosses
+
+float  m21_winRate        = pf_winRate
+float  m21_score          = pf_score
+
+string m21_grade          = pf_grade
+
+float  m21_avgTradeBars   = pf_avgTradeBars
+
+bool   m21_engineHealthy  =
+       m20_engineHealthy and
+       pf_engineReady
+
+
+//======================================================================
+// MODULE 22.01 - SIGNAL QUALITY INITIALIZATION
+//======================================================================
+
+//--------------------------------------------------
+// Quality Variables
+//--------------------------------------------------
+var float sq_score = 0.0
+var string sq_grade = "N/A"
+
+//--------------------------------------------------
+// Weight Configuration
+//--------------------------------------------------
+const float SQ_MAX_SCORE = 100.0
+
+//--------------------------------------------------
+// Engine Ready
+//--------------------------------------------------
+bool sq_engineReady =
+     m21_engineHealthy
+     
+//======================================================================
+// MODULE 22.02 - MARKET BIAS SCORE
+//======================================================================
+
+float sq_biasScore = 0.0
+
+if m21_engineHealthy
+
+    if e_marketBias == BIAS_BULL and g_signal == SIGNAL_BUY
+        sq_biasScore := 20.0
+
+    else if e_marketBias == BIAS_BEAR and g_signal == SIGNAL_SELL
+        sq_biasScore := 20.0
+
+    else
+        sq_biasScore := 0.0
+
+//======================================================================
+// MODULE 22.03 - SIGNAL BIAS SCORE
+//======================================================================
+
+//--------------------------------------------------
+// Signal Bias Score
+//--------------------------------------------------
+float sq_signalScore = 0.0
+
+if m21_engineHealthy
+
+    if e_signalBias == SIG_BUY and g_signal == SIGNAL_BUY
+        sq_signalScore := 20.0
+
+    else if e_signalBias == SIG_SELL and g_signal == SIGNAL_SELL
+        sq_signalScore := 20.0
+
+    else
+        sq_signalScore := 0.0
+        
+//======================================================================
+// MODULE 22.04 - CONFIDENCE SCORE
+//======================================================================
+
+//--------------------------------------------------
+// Confidence Score
+//--------------------------------------------------
+float sq_confidenceScore = 0.0
+
+if m21_engineHealthy
+
+    if e_tradeConfidence >= 90
+        sq_confidenceScore := 20.0
+
+    else if e_tradeConfidence >= 80
+        sq_confidenceScore := 18.0
+
+    else if e_tradeConfidence >= 70
+        sq_confidenceScore := 16.0
+
+    else if e_tradeConfidence >= 60
+        sq_confidenceScore := 12.0
+
+    else
+        sq_confidenceScore := 0.0
+
+//======================================================================
+// MODULE 22.05 - TRADE GRADE SCORE
+//======================================================================
+
+//--------------------------------------------------
+// Trade Grade Score
+//--------------------------------------------------
+float sq_gradeScore = 0.0
+
+if m21_engineHealthy
+
+    if e_tradeGrade == GRADE_A_PLUS
+        sq_gradeScore := 20.0
+
+    else if e_tradeGrade == GRADE_A
+        sq_gradeScore := 18.0
+
+    else if e_tradeGrade == GRADE_B
+        sq_gradeScore := 16.0
+
+    else if e_tradeGrade == GRADE_C
+        sq_gradeScore := 12.0
+
+    else
+        sq_gradeScore := 0.0   
+
+//======================================================================
+// MODULE 22.06 - FINAL QUALITY SCORE
+//======================================================================
+
+//--------------------------------------------------
+// Final Quality Score
+//--------------------------------------------------
+sq_score :=
+      sq_biasScore +
+      sq_signalScore +
+      sq_confidenceScore +
+      sq_gradeScore
+
+//--------------------------------------------------
+// Cap Score
+//--------------------------------------------------
+sq_score := math.min(sq_score, SQ_MAX_SCORE)
+
+//--------------------------------------------------
+// Final Grade
+//--------------------------------------------------
+if sq_score >= 95
+    sq_grade := "A+"
+else if sq_score >= 90
+    sq_grade := "A"
+else if sq_score >= 80
+    sq_grade := "B"
+else if sq_score >= 70
+    sq_grade := "C"
+else
+    sq_grade := "D"
+
+//======================================================================
+// MODULE 22.07 - DASHBOARD QUALITY ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Dashboard Quality
+//--------------------------------------------------
+string sq_dashboardScore =
+     str.tostring(math.round(sq_score, 0))
+
+string sq_dashboardGrade =
+     sq_grade
+
+string sq_dashboardStars =
+     sq_score >= 95 ? "★★★★★" :
+     sq_score >= 90 ? "★★★★☆" :
+     sq_score >= 80 ? "★★★☆☆" :
+     sq_score >= 70 ? "★★☆☆☆" :
+     "★☆☆☆☆"
+
+//======================================================================
+// MODULE 22.08 - PUBLIC API ENGINE
+//======================================================================
+
+//--------------------------------------------------
+// Public API
+//--------------------------------------------------
+float  m22_qualityScore   = sq_score
+string m22_qualityGrade   = sq_grade
+
+float  m22_biasScore      = sq_biasScore
+float  m22_signalScore    = sq_signalScore
+float  m22_confidenceScore= sq_confidenceScore
+float  m22_gradeScore     = sq_gradeScore
+
+bool   m22_engineHealthy  =
+       m21_engineHealthy and
+       sq_engineReady
+       
+                                
