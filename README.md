@@ -1,34 +1,79 @@
-# PA-1-SCALPING-PRO
-Project Codename: PHOENIX
-PA-1 SCALPING PRO
-Codename: PHOENIX
+# PA-1 SCALPING PRO
 
-Current Stage:
-Pre-M23B Audit
+## Project Codename: PHOENIX 🔥
 
-Modules:
-✅ M01 Core
-✅ M02 Session
-✅ M03 Market
-✅ M04 HTF
-✅ M05 Structure
-✅ M06 Liquidity
-✅ M07 Premium/Discount
-✅ M08 Order Block
-✅ M09 Mitigation
-✅ M10 Evidence
-✅ M11 Qualification
-✅ M12 Execution
-✅ M13 Risk
-✅ M14 Dashboard
-✅ M15 Renderer
-✅ M16 Alert
-✅ M17 Trade Manager
-✅ M18 Decision
-✅ M19 State Validation
-✅ M20 Lifecycle
-✅ M21 Performance
-✅ M22 Signal Quality
+Engine Thinks. Trader Executes.
+
+---
+
+## Status
+
+Current Build:
+**v0.1.1 STABLE (Golden Baseline)**
+
+Architecture:
+Locked
+
+Trading Platform:
+TradingView Pine Script v6
+
+Market:
+FCPO (Primary)
+XAUUSD (Secondary)
+
+---
+
+## Project Goals
+
+PA-1 SCALPING PRO is a professional Smart Money Concepts (SMC) scalping framework developed for TradingView.
+
+Core principles:
+
+- High Probability Setups
+- Institutional Price Action
+- Liquidity Based Entries
+- Rule-Based Decision Engine
+- Professional Risk Management
+
+---
+
+## Current Modules
+
+- Core Framework
+- Configuration
+- Market Engine
+- HTF Engine
+- Structure Engine
+- Liquidity Engine
+- Order Block Engine
+- Fair Value Gap Engine
+- Premium / Discount Engine
+- Session Engine
+- Risk Engine
+- Evidence Engine
+- Dashboard Data
+- Dashboard UI
+- Renderer
+- Alert Engine
+- Trade Manager
+- Decision Engine
+- Utilities
+- Debug Engine
+- Performance Monitor
+- Bootstrap
+
+---
+
+## Development Status
+
+✅ Build 0.1.1 Locked
 
 Next:
-M23B Source Code Audit
+Build 0.1.2 Performance Edition
+
+---
+
+## Motto
+
+Engine Thinks.
+Trader Executes.
