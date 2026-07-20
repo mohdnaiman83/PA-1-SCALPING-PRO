@@ -81,3 +81,83 @@ Status : Development
 
 Last Updated:
 July 2026
+
+# Module Map
+
+## M01
+Core Framework
+
+## M02
+Configuration
+
+## M03
+Market Engine
+
+## M04
+HTF Engine
+
+## M05
+Structure Engine
+
+## M06
+Liquidity Engine
+
+## M07
+Order Block Engine
+
+## M08
+Fair Value Gap Engine
+
+## M09
+Premium Discount Engine
+
+## M10
+Session Engine
+
+## M11
+Risk Engine
+
+## M12
+Evidence Engine
+
+## M13
+Dashboard Data
+
+## M14
+Dashboard UI
+
+## M15
+Renderer Engine
+
+Future Layout
+
+15.01 Renderer Controller
+
+15.02 Line Renderer
+
+15.03 Label Renderer
+
+15.04 Cleanup Manager
+
+15.05 Object Cache
+
+## M16
+Alert Engine
+
+## M17
+Trade Manager
+
+## M18
+Decision Engine
+
+## M19
+Utilities
+
+## M20
+Debug
+
+## M21
+Performance Monitor
+
+## M22
+Bootstrap
