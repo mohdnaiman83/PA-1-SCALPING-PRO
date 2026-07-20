@@ -166,6 +166,85 @@ Baseline Build
 
 v0.6.x
 
+# PHOENIX Architecture
+
+---
+
+## Data Flow
+
+Market Engine
+↓
+HTF Engine
+↓
+Structure Engine
+↓
+Liquidity Engine
+↓
+Order Block Engine
+↓
+FVG Engine
+↓
+Premium / Discount
+↓
+Evidence Engine
+↓
+Decision Engine
+↓
+Trade Manager
+↓
+Dashboard Data
+↓
+Dashboard UI
+↓
+Renderer
+
+---
+
+## Module Ownership
+
+| Module | Owner |
+|---------|--------|
+| M01 | Core |
+| M02 | Config |
+| M03 | Market |
+| M04 | HTF |
+| M05 | Structure |
+| M06 | Liquidity |
+| M07 | Order Block |
+| M08 | FVG |
+| M09 | Premium Discount |
+| M10 | Session |
+| M11 | Risk |
+| M12 | Evidence |
+| M13 | Dashboard Data |
+| M14 | Dashboard UI |
+| M15 | Renderer |
+| M16 | Alert |
+| M17 | Trade Manager |
+| M18 | Decision |
+| M19 | Utilities |
+| M20 | Debug |
+| M21 | Performance |
+| M22 | Bootstrap |
+
+---
+
+## Ownership Rule
+
+One Module
+
+↓
+
+One Responsibility
+
+↓
+
+One Owner
+
+↓
+
+Many Consumers
+
 Status:
 
 Development
