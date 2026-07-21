@@ -248,3 +248,176 @@ Many Consumers
 Status:
 
 Development
+
+21/7/26
+# PA-023 --- Developer Diagnostic System (DDS)
+
+**Status:** LOCKED\
+**Project:** PA-1 SCALPING PRO (PHOENIX)
+
+------------------------------------------------------------------------
+
+# Objective
+
+Create a **read-only diagnostic subsystem** for PA-1 that provides full
+engine visibility for development, validation and troubleshooting
+without affecting trading logic.
+
+> Philosophy:
+>
+> **"Don't guess the problem. Follow the data until the point where it
+> stops."**
+
+------------------------------------------------------------------------
+
+# Core Principles
+
+-   Read Only
+-   Zero Side Effect
+-   Pine First Design
+-   Live Diagnostics
+-   Root Cause Analysis
+-   Data Logger
+-   Circular History (Flight Recorder)
+-   Variable Watch
+-   Module Health
+-   Pipeline Trace
+-   Delta Logging
+
+------------------------------------------------------------------------
+
+# High-Level Architecture
+
+``` text
+                 PA-1 ENGINE (M01-M22)
+                         │
+          ┌──────────────┴──────────────┐
+          │                             │
+          ▼                             ▼
+
+   Trading Output                Diagnostic Output
+          │                             │
+          ▼                             ▼
+
+ Trading Dashboard          PA-023 DDS (Read Only)
+```
+
+------------------------------------------------------------------------
+
+# DDS Components
+
+## Phase 1
+
+-   Live Monitor
+-   Module Status
+-   Root Cause
+-   Pipeline Trace
+-   Variable Watch
+-   Engine Health
+
+## Phase 2
+
+-   Data Logger
+-   Circular History
+-   Timeline
+-   Event Log
+-   Module Inspector
+
+## Phase 3
+
+-   Performance Statistics
+-   Execution Counter
+-   Dependency Viewer
+-   Module Version Tracking
+
+------------------------------------------------------------------------
+
+# Data Logger
+
+Each log entry should contain:
+
+-   Timestamp
+-   Bar Index
+-   Module
+-   Status
+-   Reason
+-   Key Variables
+-   Execution Time
+
+Prefer **delta logging** (only log changes) to reduce memory usage.
+
+------------------------------------------------------------------------
+
+# Flight Recorder
+
+Implement as a circular buffer.
+
+Suggested capacity: - 50 - 100 - 200 events
+
+Oldest records are overwritten automatically.
+
+------------------------------------------------------------------------
+
+# Root Cause Analysis
+
+DDS should identify:
+
+-   Blocking Module
+-   Blocking Rule
+-   Failure Reason
+-   Upstream Dependency
+
+Example:
+
+NO TRADE → M14 Mandatory Gate → Liquidity Missing → Source: M04
+Liquidity Engine
+
+------------------------------------------------------------------------
+
+# Module Diagnostic Contract
+
+Every module (M01-M22) should expose:
+
+-   Module Name
+-   Version
+-   Triggered
+-   Status
+-   Reason
+-   Inputs
+-   Outputs
+-   Key Variables
+-   Execution Counter
+-   Execution Time
+-   Dependencies
+
+DDS only reads these values.
+
+------------------------------------------------------------------------
+
+# Pine Script Constraints
+
+Supported: - Tables - Arrays - Circular buffers - Read-only inspection -
+Timeline - Variable watch - Root cause - Pipeline trace
+
+Not in scope: - Unlimited history - Persistent database - Desktop-style
+clickable UI - External storage
+
+------------------------------------------------------------------------
+
+# Final Design Lock
+
+DDS is a developer subsystem only.
+
+It shall never:
+
+-   Generate trading signals
+-   Modify engine variables
+-   Change BUY/SELL decisions
+-   Affect risk management
+-   Affect dashboard logic
+
+Its only purpose is to inspect, validate and troubleshoot the PA-1
+Engine.
+
+**Architecture Status:** LOCKED
+
