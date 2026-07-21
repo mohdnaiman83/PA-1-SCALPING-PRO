@@ -165,14 +165,16 @@ identified.
 
 Continue PHOENIX development.
 
-Reference:
+Repository documentation is the official source of truth.
 
--   README.md
--   CHECKPOINT.md
--   PROJECT_STATE.md
--   ROADMAP.md
--   PHOENIX_SPEC_v1.0.md
--   Current PA1_SCALPING_PRO.pine
+Reference in order:
+
+1. README.md
+2. CHECKPOINT.md
+3. PROJECT_STATE.md
+4. ROADMAP.md
+5. PHOENIX_SPEC_v1.0.md
+6. Current PA1_SCALPING_PRO.pine
 
 Resume from the current task only.
 
@@ -180,6 +182,8 @@ Do not redesign completed modules unless required.
 
 Maintain architecture rules and Public API contracts.
 
+If repository documentation conflicts with previous conversation history,
+follow the repository documentation.
 ------------------------------------------------------------------------
 
 # 🚀 Motto
