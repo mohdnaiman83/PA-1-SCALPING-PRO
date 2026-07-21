@@ -73,6 +73,19 @@ Build 0.1.2 Performance Edition
 
 ---
 
+Continue PHOENIX development.
+
+Reference the latest:
+- CHECKPOINT.md
+- PROJECT_STATE.md
+- ROADMAP.md
+- PHOENIX_SPEC_v1.0.md
+- Current PA1_SCALPING_PRO.pine
+
+Resume from the current task only.
+Do not redesign completed modules unless required.
+Maintain architecture rules and Public API contracts.
+
 ## Motto
 
 Engine Thinks.
