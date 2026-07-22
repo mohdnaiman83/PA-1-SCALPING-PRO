@@ -1,4 +1,4 @@
-//======================================================================
+/======================================================================
 // MODULE 14.01 - DASHBOARD CONFIGURATION
 // BUILD : 0.5.0
 //======================================================================
@@ -1767,7 +1767,7 @@ gateStructure :=
 
 gateRisk :=
      not cfg_enableRisk or
-     m13_ready
+     m13_validation
 
 //--------------------------------------------------
 // FINAL GATE
@@ -1871,6 +1871,8 @@ bool e_filterPassed = false
 
 string e_filterReason = ""
 
+string dds_reason = ""
+
 //--------------------------------------------------
 // RESET
 //--------------------------------------------------
@@ -1890,7 +1892,19 @@ if not cfg_enableDecisionEngine
 else if not e_mandatoryGatePassed
 
     e_filterPassed := false
-    e_filterReason := "MANDATORY GATE FAILED"
+    dds_reason := ""
+
+    if not gateHTF
+        dds_reason  := "HTF"
+
+    else if not gateStructure
+        dds_reason := "STRUCT"
+
+    else if not gateRisk
+        e_filterReason := "RISK : " + dds_reason
+
+    else
+        e_filterReason := "UNKNOWN"
 
 else if not cfg_enableDecisionFilter
 
@@ -2036,15 +2050,20 @@ if cfg_enableDecisionEngine
 if cfg_showDecisionDebug
 
     label.new(
-         bar_index,
-         high,
-         "Decision : " + e_decisionStatus +
-         "\nScore : " + str.tostring(e_weightScore) +
-         "\nMode : " + e_marketMode,
-         style = label.style_label_down,
-         textcolor = color.white,
-         color = color.new(color.blue, 60),
-         size = size.tiny)
+     bar_index,
+     high,
+     "Decision : " + e_decisionStatus +
+     "\nScore : " + str.tostring(e_weightScore) +
+     "\nHTF : " + str.tostring(gateHTF) +
+     "\nStructure : " + str.tostring(gateStructure) +
+     "\nRisk : " + str.tostring(gateRisk) +
+     "\nM13 Ready : " + str.tostring(m13_ready) +
+     "\nM13 Valid : " + str.tostring(m13_validation) +
+     "\nReason : " + e_filterReason,
+     style = label.style_label_down,
+     textcolor = color.white,
+     color = color.new(color.red, 70),
+     size = size.small)
 
 //======================================================================
 // MODULE 18.09 - PUBLIC API
