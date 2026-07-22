@@ -242,7 +242,7 @@ bool e_sessionActive =
      (cfg_useDaySession and e_daySessionActive) or
      (cfg_useNightSession and e_nightSessionActive)
 
-//======================================================================
+    //======================================================================
 // MODULE 02.04 - ENVIRONMENT VALIDATION
 // BUILD : 0.2.3
 //======================================================================
