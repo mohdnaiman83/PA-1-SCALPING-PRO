@@ -5252,7 +5252,7 @@ gateHTF :=
 
 gateStructure :=
      not cfg_enableStructureFilter or
-     e_structureReady
+     m05_ready
 
 //--------------------------------------------------
 // RISK GATE
@@ -5260,7 +5260,7 @@ gateStructure :=
 
 gateRisk :=
      not cfg_enableRisk or
-     rm_ready
+     m13_ready
 
 //--------------------------------------------------
 // FINAL GATE
@@ -5307,42 +5307,42 @@ if e_htfReady
 // STRUCTURE
 //--------------------------------------------------
 
-if e_structureReady
+if m05_ready
     e_weightScore += WEIGHT_STRUCTURE
 
 //--------------------------------------------------
 // LIQUIDITY
 //--------------------------------------------------
 
-if e_liquidityReady
+if m06_ready
     e_weightScore += WEIGHT_LIQUIDITY
 
 //--------------------------------------------------
 // PREMIUM / DISCOUNT
 //--------------------------------------------------
 
-if e_pdStrong
+if m07_confidence >=70
     e_weightScore += WEIGHT_PD
 
 //--------------------------------------------------
 // ORDER BLOCK
 //--------------------------------------------------
 
-if e_obReady
+if m08_ready
     e_weightScore += WEIGHT_OB
 
 //--------------------------------------------------
 // MITIGATION
 //--------------------------------------------------
 
-if e_mitigationReady
+if m09_ready
     e_weightScore += WEIGHT_MITIGATION
 
 //--------------------------------------------------
 // EVIDENCE
 //--------------------------------------------------
 
-if e_evidenceReady
+if m10_ready
     e_weightScore += WEIGHT_EVIDENCE
 
 //--------------------------------------------------
@@ -5478,12 +5478,12 @@ if cfg_enableDecisionEngine
 
     else
 
-        if e_marketBias == BIAS_BULL
+        if m10_marketBias == BIAS_BULL
 
             e_decisionSignal := SIGNAL_BUY
             e_decisionStatus := "BUY"
 
-        else if e_marketBias == BIAS_BEAR
+        else if m10_marketBias == BIAS_BEAR
 
             e_decisionSignal := SIGNAL_SELL
             e_decisionStatus := "SELL"
@@ -5539,7 +5539,131 @@ if cfg_showDecisionDebug
          color = color.new(color.blue, 60),
          size = size.tiny)
 
-        
+//======================================================================
+// MODULE 18.09 - PUBLIC API
+// BUILD : 0.7.8
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+var bool m18_ready = false
+var bool m18_health = false
+
+//--------------------------------------------------
+// PROFILE
+//--------------------------------------------------
+
+var int  m18_profileFilter = 0
+var bool m18_profileAdaptive = false
+
+//--------------------------------------------------
+// GATE
+//--------------------------------------------------
+
+var bool m18_gatePassed = false
+
+//--------------------------------------------------
+// SCORE
+//--------------------------------------------------
+
+var int m18_weightScore = 0
+
+//--------------------------------------------------
+// FILTER
+//--------------------------------------------------
+
+var bool   m18_filterPassed = false
+var string m18_filterReason = ""
+
+//--------------------------------------------------
+// MARKET MODE
+//--------------------------------------------------
+
+var string m18_marketMode = MM_UNKNOWN
+
+//--------------------------------------------------
+// DECISION
+//--------------------------------------------------
+
+var string m18_signal = SIGNAL_NO_TRADE
+var string m18_status = "WAIT"
+
+//======================================================================
+// MODULE 18.10 - SHADOW MAPPING
+// BUILD : 0.7.9
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+m18_ready := cfg_enableDecisionEngine
+m18_health := true
+
+//--------------------------------------------------
+// PROFILE
+//--------------------------------------------------
+
+m18_profileFilter := e_profileFilter
+m18_profileAdaptive := e_profileAdaptive
+
+//--------------------------------------------------
+// GATE
+//--------------------------------------------------
+
+m18_gatePassed := e_mandatoryGatePassed
+
+//--------------------------------------------------
+// SCORE
+//--------------------------------------------------
+
+m18_weightScore := e_weightScore
+
+//--------------------------------------------------
+// FILTER
+//--------------------------------------------------
+
+m18_filterPassed := e_filterPassed
+m18_filterReason := e_filterReason
+
+//--------------------------------------------------
+// MARKET MODE
+//--------------------------------------------------
+
+m18_marketMode := e_marketMode
+
+//--------------------------------------------------
+// DECISION
+//--------------------------------------------------
+
+m18_signal := e_decisionSignal
+m18_status := e_decisionStatus
+
+//======================================================================
+// MODULE 18.11 - DDS HOOK
+// BUILD : 0.8.0
+//======================================================================
+
+// Reserved for DDS Activation
+
+bool   m18_packet_ready = m18_ready
+
+int    m18_packet_profileFilter = m18_profileFilter
+bool   m18_packet_profileAdaptive = m18_profileAdaptive
+
+bool   m18_packet_gatePassed = m18_gatePassed
+
+int    m18_packet_weightScore = m18_weightScore
+
+bool   m18_packet_filterPassed = m18_filterPassed
+string m18_packet_filterReason = m18_filterReason
+
+string m18_packet_marketMode = m18_marketMode
+
+string m18_packet_signal = m18_signal
+string m18_packet_status = m18_status
          
 //======================================================
 // MODULE 19.01
