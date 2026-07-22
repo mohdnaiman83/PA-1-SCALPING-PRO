@@ -5906,6 +5906,63 @@ bool m19_engineHealthy =
      m19_stateProtected and
      not m19_timeoutActive and
      not m19_duplicateState
+
+//======================================================================
+// MODULE 19.09 - PUBLIC API
+// BUILD : 0.8.1
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+var bool m19_ready  = false
+var bool m19_health = false
+
+//======================================================================
+// MODULE 19.10 - SHADOW MAPPING
+// BUILD : 0.8.2
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+m19_ready := true
+
+m19_health :=
+     m19_stateValid and
+     m19_transitionOK and
+     m19_integrityOK and
+     m19_stateProtected and
+     not m19_timeoutActive and
+     not m19_duplicateState
+
+//======================================================================
+// MODULE 19.11 - DDS HOOK
+// BUILD : 0.8.3
+//======================================================================
+
+//--------------------------------------------------
+// DDS STATUS
+//--------------------------------------------------
+
+bool m19_packet_ready  = m19_ready
+bool m19_packet_health = m19_health
+
+//--------------------------------------------------
+// DDS PAYLOAD
+//--------------------------------------------------
+
+bool   m19_packet_stateValid     = m19_stateValid
+bool   m19_packet_transitionOK   = m19_transitionOK
+bool   m19_packet_integrityOK    = m19_integrityOK
+bool   m19_packet_stateProtected = m19_stateProtected
+bool   m19_packet_timeoutActive  = m19_timeoutActive
+bool   m19_packet_duplicateState = m19_duplicateState
+
+string m19_packet_tradeState     = m19_tradeState
+string m19_packet_previousState  = m19_previousState    
      
 //======================================================================
 // MODULE 20.01 - TRADE LIFECYCLE INITIALIZATION
@@ -6111,6 +6168,48 @@ int    m20_totalBars      = lc_totalBars
 bool m20_engineHealthy =
      m19_engineHealthy and
      not na(lc_entryBar)
+
+//======================================================================
+// MODULE 20.09 - PUBLIC API
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+var bool m20_ready  = false
+var bool m20_health = false
+
+//======================================================================
+// MODULE 20.10 - SHADOW MAPPING
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+m20_ready := true
+
+m20_health :=
+     m20_engineHealthy
+
+//======================================================================
+// MODULE 20.11 - DDS HOOK
+//======================================================================
+
+bool   m20_packet_ready = m20_ready
+bool   m20_packet_health = m20_health
+
+string m20_packet_state = m20_lifecycleState
+
+bool   m20_packet_active = m20_isActive
+bool   m20_packet_breakEven = m20_breakEven
+bool   m20_packet_partialTP = m20_partialTP
+bool   m20_packet_trailing = m20_trailingActive
+bool   m20_packet_closed = m20_tradeClosed
+
+int    m20_packet_tradeBars = m20_tradeBars
+int    m20_packet_totalBars = m20_totalBars    
 
 //======================================================================
 // MODULE 21.01 - PERFORMANCE INITIALIZATION
@@ -6324,10 +6423,10 @@ float sq_biasScore = 0.0
 
 if m21_engineHealthy
 
-    if e_marketBias == BIAS_BULL and g_signal == SIGNAL_BUY
+    if m10_marketBias == BIAS_BULL and g_signal == SIGNAL_BUY
         sq_biasScore := 20.0
 
-    else if e_marketBias == BIAS_BEAR and g_signal == SIGNAL_SELL
+    else if m10_marketBias == BIAS_BEAR and g_signal == SIGNAL_SELL
         sq_biasScore := 20.0
 
     else
@@ -6364,16 +6463,16 @@ float sq_confidenceScore = 0.0
 
 if m21_engineHealthy
 
-    if e_tradeConfidence >= 90
+    if m11_confidence >= 90
         sq_confidenceScore := 20.0
 
-    else if e_tradeConfidence >= 80
+    else if m11_confidence >= 80
         sq_confidenceScore := 18.0
 
-    else if e_tradeConfidence >= 70
+    else if m11_confidence >= 70
         sq_confidenceScore := 16.0
 
-    else if e_tradeConfidence >= 60
+    else if m11_confidence >= 60
         sq_confidenceScore := 12.0
 
     else
@@ -6390,16 +6489,16 @@ float sq_gradeScore = 0.0
 
 if m21_engineHealthy
 
-    if e_tradeGrade == GRADE_A_PLUS
+    if m11_grade == GRADE_A_PLUS
         sq_gradeScore := 20.0
 
-    else if e_tradeGrade == GRADE_A
+    else if m11_grade == GRADE_A
         sq_gradeScore := 18.0
 
-    else if e_tradeGrade == GRADE_B
+    else if m11_grade == GRADE_B
         sq_gradeScore := 16.0
 
-    else if e_tradeGrade == GRADE_C
+    else if m11_grade == GRADE_C
         sq_gradeScore := 12.0
 
     else
