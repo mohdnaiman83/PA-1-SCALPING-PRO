@@ -1,4 +1,4 @@
-/======================================================================
+//======================================================================
 // MODULE 14.01 - DASHBOARD CONFIGURATION
 // BUILD : 0.5.0
 //======================================================================
@@ -3101,4 +3101,510 @@ bool   m22_engineHealthy  =
        m21_engineHealthy and
        sq_engineReady
        
-                                
+//======================================================================
+// MODULE 23.01 - DDS CONFIGURATION
+// BUILD : 1.0.0
+//======================================================================
+
+string GROUP_DDS = "DDS Engine"
+
+//--------------------------------------------------
+// DDS CONSOLE
+//--------------------------------------------------
+
+bool cfg_showDDS = input.bool(
+     false,
+     "Show DDS Console",
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS HEALTH
+//--------------------------------------------------
+
+bool cfg_showDDSHealth = input.bool(
+     true,
+     "Show Health",
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS GATE
+//--------------------------------------------------
+
+bool cfg_showDDSGate = input.bool(
+     true,
+     "Show Gate Analyzer",
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS REASON
+//--------------------------------------------------
+
+bool cfg_showDDSReason = input.bool(
+     true,
+     "Show Failure Reason",
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS PACKET
+//--------------------------------------------------
+
+bool cfg_showDDSPacket = input.bool(
+     false,
+     "Show Packet Inspector",
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS TIMELINE
+//--------------------------------------------------
+
+bool cfg_showDDSTimeline = input.bool(
+     false,
+     "Show Timeline",
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS LOGGER
+//--------------------------------------------------
+
+bool cfg_showDDSLogger = input.bool(
+     false,
+     "Show Logger",
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS POSITION
+//--------------------------------------------------
+
+string cfg_ddsPosition = input.string(
+     "Bottom Left",
+     "Position",
+     options = [
+          "Top Left",
+          "Top Right",
+          "Bottom Left",
+          "Bottom Right"],
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS SIZE
+//--------------------------------------------------
+
+string cfg_ddsSize = input.string(
+     "Small",
+     "Size",
+     options = [
+          "Tiny",
+          "Small",
+          "Normal"],
+     group = GROUP_DDS)
+
+//======================================================================
+// MODULE 23.02 - DDS CORE
+// BUILD : 0.9.0
+//======================================================================
+
+//--------------------------------------------------
+// ENGINE STATUS
+//--------------------------------------------------
+
+var bool   m23_ready  = false
+var bool   m23_health = false
+
+//--------------------------------------------------
+// SUMMARY
+//--------------------------------------------------
+
+var int    m23_passCount = 0
+var int    m23_failCount = 0
+
+var string m23_reason = "OK"
+
+var float  m23_healthScore = 0.0
+
+//--------------------------------------------------
+// RESET
+//--------------------------------------------------
+
+m23_passCount := 0
+m23_failCount := 0
+m23_reason := "OK"
+
+//======================================================================
+// MODULE 23.03 - COLLECTOR
+// BUILD : 0.9.0
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+if m03_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m04_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m05_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m06_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m07_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m08_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m09_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m10_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m11_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m12_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m13_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m17_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m18_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m19_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m20_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+//--------------------------------------------------
+// HEALTH SCORE
+//--------------------------------------------------
+
+int m23_totalModules = m23_passCount + m23_failCount
+
+m23_healthScore :=
+     m23_totalModules > 0 ?
+     (float(m23_passCount) / float(m23_totalModules)) * 100.0 :
+     0.0
+
+m23_ready := true
+
+m23_health := m23_healthScore >= 80
+
+//======================================================================
+// MODULE 23.04 - GATE ANALYZER
+// BUILD : 0.9.1
+//======================================================================
+
+//--------------------------------------------------
+// GATE STATUS
+//--------------------------------------------------
+
+var bool m23_gateHTF        = false
+var bool m23_gateStructure  = false
+var bool m23_gateRisk       = false
+var bool m23_gateDecision   = false
+var bool m23_gateExecution  = false
+
+//--------------------------------------------------
+// GATE UPDATE
+//--------------------------------------------------
+
+m23_gateHTF       := m04_ready
+m23_gateStructure := m05_ready
+m23_gateRisk      := m13_validation
+m23_gateDecision  := m18_filterPassed
+m23_gateExecution := m12_canTrade
+
+//======================================================================
+// MODULE 23.05 - REASON ENGINE
+// BUILD : 0.9.1
+//======================================================================
+
+//--------------------------------------------------
+// FAILURE REASON
+//--------------------------------------------------
+
+m23_reason := "OK"
+
+if not m23_gateHTF
+
+    m23_reason := "HTF FILTER FAILED"
+
+else if not m23_gateStructure
+
+    m23_reason := "STRUCTURE FAILED"
+
+else if not m23_gateRisk
+
+    m23_reason := "RISK MODEL FAILED"
+
+else if not m23_gateDecision
+
+    m23_reason := m18_filterReason
+
+else if not m23_gateExecution
+
+    m23_reason := m12_reasonCode
+
+//======================================================================
+// MODULE 23.06 - PUBLIC API
+// BUILD : 0.9.1
+//======================================================================
+
+//--------------------------------------------------
+// DDS OUTPUT
+//--------------------------------------------------
+
+var bool   m23_gatePassed = false
+
+m23_gatePassed :=
+     m23_gateHTF and
+     m23_gateStructure and
+     m23_gateRisk and
+     m23_gateDecision and
+     m23_gateExecution
+
+    //======================================================================
+// MODULE 23.07 - DDS DASHBOARD ENGINE
+// BUILD : 0.9.2
+//======================================================================
+
+//--------------------------------------------------
+// DDS TABLE
+//--------------------------------------------------
+
+var table m23_ddsTable = na
+
+//--------------------------------------------------
+// CREATE TABLE
+//--------------------------------------------------
+
+if cfg_showDDS and na(m23_ddsTable)
+
+    m23_ddsTable := table.new(
+         position.bottom_left,
+         2,
+         10,
+         bgcolor = color.new(color.black, 20),
+         frame_color = color.gray,
+         frame_width = 1)
+
+//--------------------------------------------------
+// HEADER
+//--------------------------------------------------
+
+if cfg_showDDS and not na(m23_ddsTable)
+
+    table.cell(
+         m23_ddsTable,
+         0,
+         0,
+         "DDS ENGINE",
+         text_color = color.yellow)
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         0,
+         str.tostring(math.round(m23_healthScore,1)) + "%",
+         text_color = m23_health ? color.lime : color.red)
+
+//--------------------------------------------------
+// HEALTH
+//--------------------------------------------------
+
+    table.cell(
+         m23_ddsTable,
+         0,
+         1,
+         "Health")
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         1,
+         m23_health ? "PASS" : "FAIL",
+         text_color = m23_health ? color.lime : color.red)
+
+//--------------------------------------------------
+// MODULES
+//--------------------------------------------------
+
+    table.cell(m23_ddsTable,0,2,"PASS")
+    table.cell(m23_ddsTable,1,2,str.tostring(m23_passCount))
+
+    table.cell(m23_ddsTable,0,3,"FAIL")
+    table.cell(m23_ddsTable,1,3,str.tostring(m23_failCount))
+
+//--------------------------------------------------
+// GATE
+//--------------------------------------------------
+
+    table.cell(m23_ddsTable,0,4,"Gate")
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         4,
+         m23_gatePassed ? "PASS" : "FAIL",
+         text_color = m23_gatePassed ? color.lime : color.red)
+
+//--------------------------------------------------
+// HTF
+//--------------------------------------------------
+
+    table.cell(m23_ddsTable,0,5,"HTF")
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         5,
+         m23_gateHTF ? "OK" : "FAIL",
+         text_color = m23_gateHTF ? color.lime : color.red)
+
+//--------------------------------------------------
+// STRUCTURE
+//--------------------------------------------------
+
+    table.cell(m23_ddsTable,0,6,"Structure")
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         6,
+         m23_gateStructure ? "OK" : "FAIL",
+         text_color = m23_gateStructure ? color.lime : color.red)
+
+//--------------------------------------------------
+// RISK
+//--------------------------------------------------
+
+    table.cell(m23_ddsTable,0,7,"Risk")
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         7,
+         m23_gateRisk ? "OK" : "FAIL",
+         text_color = m23_gateRisk ? color.lime : color.red)
+
+//--------------------------------------------------
+// REASON
+//--------------------------------------------------
+
+    table.cell(
+         m23_ddsTable,
+         0,
+         8,
+         "Reason")
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         8,
+         m23_reason,
+         text_color = color.orange)
+
+//======================================================================
+// MODULE 23.08 - DDS PACKET INSPECTOR
+// BUILD : 0.9.3
+//======================================================================
+
+//--------------------------------------------------
+// PACKET SUMMARY
+//--------------------------------------------------
+
+var int    m23_packetReadyCount = 0
+var int    m23_packetFailCount  = 0
+
+m23_packetReadyCount := 0
+m23_packetFailCount  := 0
+
+//--------------------------------------------------
+// READY CHECK
+//--------------------------------------------------
+
+m23_packetReadyCount += m17_packet_ready ? 1 : 0
+m23_packetFailCount  += m17_packet_ready ? 0 : 1
+
+m23_packetReadyCount += m18_packet_ready ? 1 : 0
+m23_packetFailCount  += m18_packet_ready ? 0 : 1
+
+m23_packetReadyCount += m19_packet_ready ? 1 : 0
+m23_packetFailCount  += m19_packet_ready ? 0 : 1
+
+m23_packetReadyCount += m20_packet_ready ? 1 : 0
+m23_packetFailCount  += m20_packet_ready ? 0 : 1
+
+//--------------------------------------------------
+// HEALTH
+//--------------------------------------------------
+
+bool m23_packetHealth =
+     m23_packetFailCount == 0
+
+//--------------------------------------------------
+// DASHBOARD
+//--------------------------------------------------
+
+if cfg_showDDS and not na(m23_ddsTable)
+
+    table.cell(
+         m23_ddsTable,
+         0,
+         9,
+         "Packets")
+
+    table.cell(
+         m23_ddsTable,
+         1,
+         9,
+         str.tostring(m23_packetReadyCount) +
+         "/" +
+         str.tostring(
+             m23_packetReadyCount +
+             m23_packetFailCount),
+         text_color =
+             m23_packetHealth ?
+             color.lime :
+             color.red)
+             
+                    
