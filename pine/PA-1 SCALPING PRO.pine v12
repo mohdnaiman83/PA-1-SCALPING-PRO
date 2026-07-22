@@ -390,6 +390,125 @@ if e_marketExpansion
 bool e_marketStrong = e_marketConfidence >= 80
 
 //======================================================================
+// MODULE 03.06 - PUBLIC API (SHADOW LAYER)
+// BUILD : 0.3.5
+//
+// PURPOSE
+// Public interface for Module 03.
+//
+// RULES
+// - Read-only for external modules.
+// - Values are populated by Legacy Mapping.
+// - Do not implement business logic here.
+//======================================================================
+
+//----------------------------------------------------
+// STATUS
+//----------------------------------------------------
+
+var bool m03_ready = false
+var bool m03_health = false
+
+//----------------------------------------------------
+// ATR
+//----------------------------------------------------
+
+var float m03_atr = na
+
+//----------------------------------------------------
+// VOLATILITY
+//----------------------------------------------------
+
+var bool m03_marketVolatile = false
+
+//----------------------------------------------------
+// MARKET STATE
+//----------------------------------------------------
+
+var bool m03_marketReady = false
+var bool m03_marketExpansion = false
+var bool m03_marketCompression = false
+
+//----------------------------------------------------
+// TREND
+//----------------------------------------------------
+
+var bool m03_marketBullish = false
+var bool m03_marketBearish = false
+var bool m03_marketTrending = false
+
+//----------------------------------------------------
+// CONFIDENCE
+//----------------------------------------------------
+
+var int m03_marketConfidence = 0
+var bool m03_marketStrong = false
+
+//======================================================================
+// MODULE 03.07 - SHADOW MAPPING
+// BUILD : 0.3.6
+//
+// PURPOSE
+// Legacy → Public API Mapping.
+//
+// RULES
+// - No business logic.
+// - Mapping only.
+//======================================================================
+
+//----------------------------------------------------
+// STATUS
+//----------------------------------------------------
+
+m03_ready  := true
+m03_health := true
+
+//----------------------------------------------------
+// ATR
+//----------------------------------------------------
+
+m03_atr := e_atr
+
+//----------------------------------------------------
+// VOLATILITY
+//----------------------------------------------------
+
+m03_marketVolatile := e_marketVolatile
+
+//----------------------------------------------------
+// MARKET STATE
+//----------------------------------------------------
+
+m03_marketReady := e_marketReady
+m03_marketExpansion := e_marketExpansion
+m03_marketCompression := e_marketCompression
+
+//----------------------------------------------------
+// TREND
+//----------------------------------------------------
+
+m03_marketBullish := e_marketBullish
+m03_marketBearish := e_marketBearish
+m03_marketTrending := e_marketTrending
+
+//----------------------------------------------------
+// CONFIDENCE
+//----------------------------------------------------
+
+m03_marketConfidence := e_marketConfidence
+m03_marketStrong := e_marketStrong
+
+//======================================================================
+// MODULE 03.08 - DDS HOOK
+// BUILD : 0.3.7
+//
+// PURPOSE
+// Reserved for DDS integration.
+//
+// NOTE
+// Do not place business logic here.
+
+//======================================================================
 // MODULE 04.01 - HTF CONFIGURATION
 // BUILD : 0.4.0
 //======================================================================
@@ -469,6 +588,96 @@ bool e_htfAlignedBullish = e_htfBullish and e_htf2Bullish
 bool e_htfAlignedBearish = e_htfBearish and e_htf2Bearish
 
 bool e_htfReady = not cfg_enableHTFFilter or e_htfAlignedBullish or e_htfAlignedBearish
+
+//======================================================================
+// MODULE 04.04 - PUBLIC API (SHADOW LAYER)
+// BUILD : 0.4.3
+//
+// PURPOSE
+// Public interface for Module 04.
+//
+// RULES
+// - Read-only for external modules.
+// - Values are populated by Legacy Mapping.
+// - Do not implement business logic here.
+//======================================================================
+
+//----------------------------------------------------
+// STATUS
+//----------------------------------------------------
+
+var bool m04_ready = false
+var bool m04_health = false
+
+//----------------------------------------------------
+// HTF TREND
+//----------------------------------------------------
+
+var bool m04_htfBullish = false
+var bool m04_htfBearish = false
+
+//----------------------------------------------------
+// HTF ALIGNMENT
+//----------------------------------------------------
+
+var bool m04_htfAlignedBullish = false
+var bool m04_htfAlignedBearish = false
+
+//----------------------------------------------------
+// HTF FILTER
+//----------------------------------------------------
+
+var bool m04_htfReady = false
+
+//======================================================================
+// MODULE 04.05 - SHADOW MAPPING
+// BUILD : 0.4.4
+//
+// PURPOSE
+// Legacy → Public API Mapping.
+//
+// RULES
+// - No business logic.
+// - Mapping only.
+//======================================================================
+
+//----------------------------------------------------
+// STATUS
+//----------------------------------------------------
+
+m04_ready := true
+m04_health := true
+
+//----------------------------------------------------
+// HTF TREND
+//----------------------------------------------------
+
+m04_htfBullish := e_htfBullish
+m04_htfBearish := e_htfBearish
+
+//----------------------------------------------------
+// HTF ALIGNMENT
+//----------------------------------------------------
+
+m04_htfAlignedBullish := e_htfAlignedBullish
+m04_htfAlignedBearish := e_htfAlignedBearish
+
+//----------------------------------------------------
+// HTF FILTER
+//----------------------------------------------------
+
+m04_htfReady := e_htfReady
+
+//======================================================================
+// MODULE 04.06 - DDS HOOK
+// BUILD : 0.4.5
+//
+// PURPOSE
+// Reserved for DDS integration.
+//
+// NOTE
+// Do not place business logic here.
+//======================================================================
 
 //======================================================================
 // MODULE 05.00 - PUBLIC API (SHADOW LAYER)
