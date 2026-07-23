@@ -1,4 +1,4 @@
-//======================================================================
+/======================================================================
 // MODULE 14.01 - DASHBOARD CONFIGURATION
 // BUILD : 0.5.0
 //======================================================================
@@ -1751,7 +1751,7 @@ bool gateRisk = false
 
 gateHTF :=
      not cfg_enableHTFFilter or
-     e_htfReady
+     m04_htfReady
 
 //--------------------------------------------------
 // STRUCTURE GATE
@@ -1807,7 +1807,7 @@ e_weightScore := 0
 // HTF
 //--------------------------------------------------
 
-if e_htfReady
+if m04_htfReady
     e_weightScore += WEIGHT_HTF
 
 //--------------------------------------------------
@@ -1860,7 +1860,7 @@ e_weightScore := math.min(100, e_weightScore)
 
 //======================================================================
 // MODULE 18.05 - DECISION FILTER ENGINE
-// BUILD : 0.7.4 ALPHA
+// BUILD : 0.8.0
 //======================================================================
 
 //--------------------------------------------------
@@ -1868,10 +1868,7 @@ e_weightScore := math.min(100, e_weightScore)
 //--------------------------------------------------
 
 bool e_filterPassed = false
-
 string e_filterReason = ""
-
-string dds_reason = ""
 
 //--------------------------------------------------
 // RESET
@@ -1892,19 +1889,22 @@ if not cfg_enableDecisionEngine
 else if not e_mandatoryGatePassed
 
     e_filterPassed := false
-    dds_reason := ""
 
     if not gateHTF
-        dds_reason  := "HTF"
+
+        e_filterReason := "HTF FAILED"
 
     else if not gateStructure
-        dds_reason := "STRUCT"
+
+        e_filterReason := "STRUCTURE FAILED"
 
     else if not gateRisk
-        e_filterReason := "RISK : " + dds_reason
+
+        e_filterReason := "RISK FAILED"
 
     else
-        e_filterReason := "UNKNOWN"
+
+        e_filterReason := "MANDATORY GATE FAILED"
 
 else if not cfg_enableDecisionFilter
 
@@ -1951,15 +1951,15 @@ if not e_profileAdaptive
 
 else
 
-    if e_marketVolatile
+    if m03_marketVolatile
 
         e_marketMode := MM_VOLATILE
 
-    else if e_marketTrending
+    else if m03_marketTrending
 
         e_marketMode := MM_TRENDING
 
-    else if e_marketCompression
+    else if m03_marketCompression
 
         e_marketMode := MM_RANGING
 
@@ -2196,7 +2196,7 @@ string m18_packet_status = m18_status
 // STATE VALIDATION
 //======================================================
 
-var string ts_prevState   = ""
+var string ts_prevState   = "TRADE_WAIT"
 var bool   ts_hasChanged  = false
 var bool   ts_isValid     = true
 
@@ -2278,10 +2278,10 @@ if g_tradeState == TS_SELL_READY and g_signal != SIGNAL_SELL
 //--------------------------------------------------
 // Direction ↔ Trade State Validation
 //--------------------------------------------------
-if g_tradeState == TS_BUY_ACTIVE and ex_direction != DIR_LONG
+if g_tradeState == TS_BUY_ACTIVE and m17_tradeDirection != DIR_LONG
     ts_directionMismatch := true
 
-if g_tradeState == TS_SELL_ACTIVE and ex_direction != DIR_SHORT
+if g_tradeState == TS_SELL_ACTIVE and m17_tradeDirection != DIR_SHORT
     ts_directionMismatch := true
 
 //--------------------------------------------------
@@ -2541,7 +2541,7 @@ bool lc_newEntry =
 //--------------------------------------------------
 if lc_newEntry
 
-    lc_state     := LC_ACTIVE
+    //lc_state     := LC_ACTIVE
     lc_entryBar  := bar_index
     lc_exitBar   := na
     lc_tradeBars := 0
@@ -2919,6 +2919,72 @@ bool   m21_engineHealthy  =
        m20_engineHealthy and
        pf_engineReady
 
+//======================================================================
+// MODULE 21.09 - PUBLIC API
+// BUILD : 0.1.0
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+var bool m21_ready  = false
+var bool m21_health = false
+
+//======================================================================
+// MODULE 21.10 - SHADOW MAPPING
+// BUILD : 0.1.0
+//======================================================================
+
+//--------------------------------------------------
+// MODULE STATUS
+//--------------------------------------------------
+
+m21_ready := true
+
+m21_health :=
+     m21_engineHealthy
+
+//--------------------------------------------------
+// PERFORMANCE
+//--------------------------------------------------
+
+m21_totalTrades  := pf_totalTrades
+m21_totalWins    := pf_totalWins
+m21_totalLosses  := pf_totalLosses
+
+m21_winRate      := pf_winRate
+m21_score        := pf_score
+m21_grade        := pf_grade
+
+m21_avgTradeBars := pf_avgTradeBars
+
+//======================================================================
+// MODULE 21.11 - DDS HOOK
+// BUILD : 0.1.0
+//======================================================================
+
+//--------------------------------------------------
+// DDS STATUS
+//--------------------------------------------------
+
+bool m21_packet_ready  = m21_ready
+bool m21_packet_health = m21_health
+
+//--------------------------------------------------
+// DDS PAYLOAD
+//--------------------------------------------------
+
+int    m21_packet_totalTrades  = m21_totalTrades
+int    m21_packet_totalWins    = m21_totalWins
+int    m21_packet_totalLosses  = m21_totalLosses
+
+float  m21_packet_winRate      = m21_winRate
+float  m21_packet_score        = m21_score
+
+string m21_packet_grade        = m21_grade
+
+float  m21_packet_avgTradeBars = m21_avgTradeBars
 
 //======================================================================
 // MODULE 22.01 - SIGNAL QUALITY INITIALIZATION
@@ -2969,10 +3035,10 @@ float sq_signalScore = 0.0
 
 if m21_engineHealthy
 
-    if e_signalBias == SIG_BUY and g_signal == SIGNAL_BUY
+    if m10_signalBias == SIG_BUY and g_signal == SIGNAL_BUY
         sq_signalScore := 20.0
 
-    else if e_signalBias == SIG_SELL and g_signal == SIGNAL_SELL
+    else if m10_signalBias == SIG_SELL and g_signal == SIGNAL_SELL
         sq_signalScore := 20.0
 
     else
@@ -3100,7 +3166,61 @@ float  m22_gradeScore     = sq_gradeScore
 bool   m22_engineHealthy  =
        m21_engineHealthy and
        sq_engineReady
-       
+
+ //======================================================================
+// MODULE 22.09 - PUBLIC API
+//======================================================================
+
+//--------------------------------------------------
+// Module Status
+//--------------------------------------------------
+var bool m22_ready  = false
+var bool m22_health = false
+
+//======================================================================
+// MODULE 22.10 - SHADOW MAPPING
+//======================================================================
+
+//--------------------------------------------------
+// Module Status
+//--------------------------------------------------
+m22_ready := true
+
+m22_health :=
+     m22_engineHealthy
+
+//--------------------------------------------------
+// Quality
+//--------------------------------------------------
+m22_qualityScore     := sq_score
+m22_qualityGrade     := sq_grade
+
+m22_biasScore        := sq_biasScore
+m22_signalScore      := sq_signalScore
+m22_confidenceScore  := sq_confidenceScore
+m22_gradeScore       := sq_gradeScore
+
+//======================================================================
+// MODULE 22.11 - DDS HOOK
+//======================================================================
+
+//--------------------------------------------------
+// DDS Status
+//--------------------------------------------------
+bool m22_packet_ready  = m22_ready
+bool m22_packet_health = m22_health
+
+//--------------------------------------------------
+// DDS Payload
+//--------------------------------------------------
+float  m22_packet_qualityScore      = m22_qualityScore
+string m22_packet_qualityGrade      = m22_qualityGrade
+
+float  m22_packet_biasScore         = m22_biasScore
+float  m22_packet_signalScore       = m22_signalScore
+float  m22_packet_confidenceScore   = m22_confidenceScore
+float  m22_packet_gradeScore        = m22_gradeScore
+
 //======================================================================
 // MODULE 23.01 - DDS CONFIGURATION
 // BUILD : 1.0.0
@@ -3309,6 +3429,16 @@ else
     m23_failCount += 1
 
 if m20_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m21_ready
+    m23_passCount += 1
+else
+    m23_failCount += 1
+
+if m22_ready
     m23_passCount += 1
 else
     m23_failCount += 1
@@ -3574,6 +3704,12 @@ m23_packetFailCount  += m19_packet_ready ? 0 : 1
 m23_packetReadyCount += m20_packet_ready ? 1 : 0
 m23_packetFailCount  += m20_packet_ready ? 0 : 1
 
+m23_packetReadyCount += m21_packet_ready ? 1 : 0
+m23_packetFailCount  += m21_packet_ready ? 0 : 1
+
+m23_packetReadyCount += m22_packet_ready ? 1 : 0
+m23_packetFailCount  += m22_packet_ready ? 0 : 1
+
 //--------------------------------------------------
 // HEALTH
 //--------------------------------------------------
@@ -3607,4 +3743,34 @@ if cfg_showDDS and not na(m23_ddsTable)
              color.lime :
              color.red)
              
-                    
+//======================================================================
+// MODULE 23.09 - DDS HOOK
+// BUILD : 1.0.0
+//======================================================================
+
+//--------------------------------------------------
+// DDS STATUS
+//--------------------------------------------------
+
+bool m23_packet_ready  = m23_ready
+bool m23_packet_health = m23_health
+
+//--------------------------------------------------
+// DDS PAYLOAD
+//--------------------------------------------------
+
+bool   m23_packet_gatePassed   = m23_gatePassed
+
+int    m23_packet_passCount    = m23_passCount
+int    m23_packet_failCount    = m23_failCount
+
+float  m23_packet_healthScore  = m23_healthScore
+
+string m23_packet_reason       = m23_reason
+
+bool   m23_packet_gateHTF       = m23_gateHTF
+bool   m23_packet_gateStructure = m23_gateStructure
+bool   m23_packet_gateRisk      = m23_gateRisk
+bool   m23_packet_gateDecision  = m23_gateDecision
+bool   m23_packet_gateExecution = m23_gateExecution
+
