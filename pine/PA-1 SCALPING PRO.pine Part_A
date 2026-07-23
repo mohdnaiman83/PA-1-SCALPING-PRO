@@ -1271,9 +1271,15 @@ bool e_bearishOBReady = not na(e_bearishOBHigh) and not na(e_bearishOBLow)
 // BUILD : 0.8.3
 //======================================================================
 
-bool e_validBullishOB = e_bullishOBReady and e_structureBullish and e_inDiscount
+bool e_validBullishOB =
+     e_bullishOBReady and
+     m05_structureBullish and
+     m07_inDiscount
 
-bool e_validBearishOB = e_bearishOBReady and e_structureBearish and e_inPremium
+bool e_validBearishOB =
+     e_bearishOBReady and
+     m05_structureBearish and
+     m07_inPremium
 
 bool e_obReady = e_validBullishOB or e_validBearishOB
 
@@ -1423,9 +1429,9 @@ bool e_bearishMitigationReady = e_bearishMitigation
 // BUILD : 0.9.3
 //======================================================================
 
-bool e_validBullishMitigation = e_bullishMitigationReady and e_validBullishOB
+bool e_validBullishMitigation = e_bullishMitigationReady and m08_validBullish
 
-bool e_validBearishMitigation = e_bearishMitigationReady and e_validBearishOB
+bool e_validBearishMitigation = e_bearishMitigationReady and m08_validBearish
 
 bool e_mitigationReady = e_validBullishMitigation or e_validBearishMitigation
 
