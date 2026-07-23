@@ -1769,10 +1769,10 @@ if cfg_enableEvidence and
    cfg_enableOBFilter and
    m08_ready
 
-    if m08_packet_validBullish
+    if m08_validBullish
         e_bullEvidence += 1
 
-    if m08_packet_validBearish
+    if m08_validBearish
         e_bearEvidence += 1
 
 //----------------------------------------------------
@@ -1783,10 +1783,10 @@ if cfg_enableEvidence and
    cfg_enableMitigationFilter and
    m09_ready
 
-    if m09_packet_validBullish
+    if m09_validBullish
         e_bullEvidence += 1
 
-    if m09_packet_validBearish
+    if m09_validBearish
         e_bearEvidence += 1
 
 //======================================================================
