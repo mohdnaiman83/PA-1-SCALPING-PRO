@@ -804,14 +804,6 @@ bool e_bosBullish = e_swingReady and close > e_lastSwingHigh
 bool e_bosBearish = e_swingReady and close < e_lastSwingLow
 
 //----------------------------------------------------
-// STRUCTURE DIRECTION
-//----------------------------------------------------
-
-bool e_structureBullish = e_bosBullish
-
-bool e_structureBearish = e_bosBearish
-
-//----------------------------------------------------
 // BOS READY
 //----------------------------------------------------
 
@@ -822,17 +814,76 @@ bool e_bosReady = e_bosBullish or e_bosBearish
 // BUILD : 0.5.3
 //======================================================================
 
+//======================================================================
+// MODULE 05.05 - STRUCTURE STATE ENGINE
+// BUILD : 0.6.0
+//======================================================================
+
 //----------------------------------------------------
-// CHANGE OF CHARACTER
+// STRUCTURE STATE
 //----------------------------------------------------
 
-bool e_chochBullish =
-     e_structureBearish[1] and
-     e_bosBullish
+const int STRUCT_WAIT = 0
+const int STRUCT_BULL = 1
+const int STRUCT_BEAR = -1
 
-bool e_chochBearish =
-     e_structureBullish[1] and
-     e_bosBearish
+var int e_structureState = STRUCT_WAIT
+
+//----------------------------------------------------
+// CHOCH
+//----------------------------------------------------
+
+bool e_chochBullish = false
+bool e_chochBearish = false
+
+e_chochBullish := false
+e_chochBearish := false
+
+//----------------------------------------------------
+// STATE MACHINE
+//----------------------------------------------------
+
+if e_bosBullish
+    e_chochBullish := e_structureState == STRUCT_BEAR
+    e_structureState := STRUCT_BULL
+
+else if e_bosBearish
+    e_chochBearish := e_structureState == STRUCT_BULL
+    e_structureState := STRUCT_BEAR
+
+//----------------------------------------------------
+// DERIVED STRUCTURE
+//----------------------------------------------------
+
+bool e_structureBullish =
+     e_structureState == STRUCT_BULL
+
+bool e_structureBearish =
+     e_structureState == STRUCT_BEAR
+
+//----------------------------------------------------
+// TREND
+//----------------------------------------------------
+
+bool e_structureUptrend =
+     e_structureBullish
+
+bool e_structureDowntrend =
+     e_structureBearish
+
+bool e_structureTransition =
+     e_chochBullish or
+     e_chochBearish
+
+bool e_structureRange =
+     e_structureState == STRUCT_WAIT
+
+//----------------------------------------------------
+// READY
+//----------------------------------------------------
+
+bool e_structureReady =
+     e_structureState != STRUCT_WAIT
 
 //----------------------------------------------------
 // CHOCH READY
@@ -842,39 +893,9 @@ bool e_chochReady =
      e_chochBullish or
      e_chochBearish
 
-    //======================================================================
-// MODULE 05.05 - STRUCTURE STATE ENGINE
-// BUILD : 0.5.4
 //======================================================================
-
-//----------------------------------------------------
-// STRUCTURE STATE
-//----------------------------------------------------
-
-bool e_structureUptrend = e_bosBullish and not e_chochBearish
-
-bool e_structureDowntrend = e_bosBearish and not e_chochBullish
-
-bool e_structureTransition =
-     e_chochBullish or
-     e_chochBearish
-
-bool e_structureRange =
-     not e_structureUptrend and
-     not e_structureDowntrend and
-     not e_structureTransition
-
-//----------------------------------------------------
-// STRUCTURE READY
-//----------------------------------------------------
-
-bool e_structureReady =
-     e_bosReady or
-     e_chochReady
-
-    //======================================================================
 // MODULE 05.06 - STRUCTURE CONFIDENCE
-// BUILD : 0.5.6
+// BUILD : 0.6.0
 //======================================================================
 
 //----------------------------------------------------
@@ -883,25 +904,25 @@ bool e_structureReady =
 
 int e_structureConfidence = 0
 
-e_structureConfidence := 0
+if not e_swingReady
+    e_structureConfidence := 0
+else
+    switch e_structureState
+        STRUCT_WAIT =>
+            e_structureConfidence := 20
 
-if e_swingReady
-    e_structureConfidence += 20
+        STRUCT_BULL =>
+            e_structureConfidence := e_chochBullish ? 70 : 90
 
-if e_bosReady
-    e_structureConfidence += 30
-
-if e_chochReady
-    e_structureConfidence += 20
-
-if e_structureReady
-    e_structureConfidence += 30
+        STRUCT_BEAR =>
+            e_structureConfidence := e_chochBearish ? 70 : 90
 
 //----------------------------------------------------
 // STRUCTURE STRONG
 //----------------------------------------------------
 
-bool e_structureStrong = e_structureConfidence >= 70
+bool e_structureStrong =
+     e_structureConfidence >= 80
 
 //======================================================================
 // MODULE 05.07 - SHADOW API MAPPING
@@ -3582,13 +3603,10 @@ if cfg_showRiskDebug and barstate.islast
 // Ownership moved to Module 17.
 // Module 13 only exposes Risk outputs.
 //
-//--------------------------------------------------
-// DASHBOARD VALUES
-//--------------------------------------------------
-
-g_dashboardEntry := rm_entry
-g_dashboardSL    := rm_stopLoss
-g_dashboardTP    := rm_takeProfit
+//==================================================
+// Dashboard ownership moved to Module 18.
+// Module 13 only exposes Risk outputs.
+//==================================================
 
 //======================================================================
 // MODULE 13.12 - PUBLIC API
