@@ -1,4 +1,4 @@
-/======================================================================
+//======================================================================
 // MODULE 14.01 - DASHBOARD CONFIGURATION
 // BUILD : 0.5.0
 //======================================================================
@@ -2043,6 +2043,18 @@ if cfg_enableDecisionEngine
     g_dashboardSignal := g_signal
     g_dashboardStatus := e_decisionStatus
 
+    if e_filterPassed
+
+        g_dashboardEntry := rm_entry
+        g_dashboardSL    := rm_stopLoss
+        g_dashboardTP    := rm_takeProfit
+
+    else
+
+        g_dashboardEntry := na
+        g_dashboardSL    := na
+        g_dashboardTP    := na
+        
 //--------------------------------------------------
 // DEBUG
 //--------------------------------------------------
@@ -2541,7 +2553,7 @@ bool lc_newEntry =
 //--------------------------------------------------
 if lc_newEntry
 
-    //lc_state     := LC_ACTIVE
+    lc_state     := LC_ACTIVE
     lc_entryBar  := bar_index
     lc_exitBar   := na
     lc_tradeBars := 0
@@ -3236,6 +3248,36 @@ bool cfg_showDDS = input.bool(
      false,
      "Show DDS Console",
      group = GROUP_DDS)
+     
+//--------------------------------------------------
+// DDS VIEW
+//--------------------------------------------------
+
+string cfg_ddsView = input.string(
+     "Summary",
+     "View",
+     options = [
+          "Summary",
+          "Packet Inspector",
+          "Timeline",
+          "Logger"],
+     group = GROUP_DDS)
+
+//--------------------------------------------------
+// DDS MODULE
+//--------------------------------------------------
+
+string cfg_ddsModule = input.string(
+     "M17",
+     "Inspect Module",
+     options = [
+          "M17",
+          "M18",
+          "M19",
+          "M20",
+          "M21",
+          "M22"],
+     group = GROUP_DDS)     
 
 //--------------------------------------------------
 // DDS HEALTH
@@ -3532,7 +3574,7 @@ m23_gatePassed :=
      m23_gateDecision and
      m23_gateExecution
 
-    //======================================================================
+//======================================================================
 // MODULE 23.07 - DDS DASHBOARD ENGINE
 // BUILD : 0.9.2
 //======================================================================
@@ -3552,8 +3594,8 @@ if cfg_showDDS and na(m23_ddsTable)
     m23_ddsTable := table.new(
          position.bottom_left,
          2,
-         10,
-         bgcolor = color.new(color.black, 20),
+         18,
+         bgcolor = color.new(#a0a4ad, 20),
          frame_color = color.gray,
          frame_width = 1)
 
@@ -3561,7 +3603,9 @@ if cfg_showDDS and na(m23_ddsTable)
 // HEADER
 //--------------------------------------------------
 
-if cfg_showDDS and not na(m23_ddsTable)
+if cfg_showDDS and
+   cfg_ddsView == "Summary" and
+   not na(m23_ddsTable)
 
     table.cell(
          m23_ddsTable,
@@ -3718,30 +3762,53 @@ bool m23_packetHealth =
      m23_packetFailCount == 0
 
 //--------------------------------------------------
+// MODULE READY STATUS
+//--------------------------------------------------
+
+string m23_m17Status = m17_packet_ready ? "OK" : "FAIL"
+string m23_m18Status = m18_packet_ready ? "OK" : "FAIL"
+string m23_m19Status = m19_packet_ready ? "OK" : "FAIL"
+string m23_m20Status = m20_packet_ready ? "OK" : "FAIL"
+string m23_m21Status = m21_packet_ready ? "OK" : "FAIL"
+string m23_m22Status = m22_packet_ready ? "OK" : "FAIL"
+
+//--------------------------------------------------
 // DASHBOARD
 //--------------------------------------------------
 
-if cfg_showDDS and not na(m23_ddsTable)
+if cfg_showDDS and
+   cfg_ddsView == "Packet Inspector" and
+   cfg_ddsModule == "M17" and
+   not na(m23_ddsTable)
 
-    table.cell(
-         m23_ddsTable,
-         0,
-         9,
-         "Packets")
+    table.cell(m23_ddsTable,0,9,"M17")
+    table.cell(m23_ddsTable,1,9,m17_packet_tradeRunning ? "RUNNING" : "IDLE",text_color =m17_packet_tradeRunning ?
+         color.lime :
+         color.gray)
 
-    table.cell(
-         m23_ddsTable,
-         1,
-         9,
-         str.tostring(m23_packetReadyCount) +
-         "/" +
-         str.tostring(
-             m23_packetReadyCount +
-             m23_packetFailCount),
-         text_color =
-             m23_packetHealth ?
-             color.lime :
-             color.red)
+    table.cell(m23_ddsTable,0,10,"State")
+    table.cell(m23_ddsTable,1,10,str.tostring(m17_packet_tradeState))
+
+    table.cell(m23_ddsTable,0,11,"Entry")
+    table.cell(m23_ddsTable,1,11,str.tostring(m17_packet_entry))
+
+    table.cell(m23_ddsTable,0,12,"SL")
+    table.cell(m23_ddsTable,1,12,str.tostring(m17_packet_stopLoss))
+
+    table.cell(m23_ddsTable,0,13,"TP")
+    table.cell(m23_ddsTable,1,13,str.tostring(m17_packet_takeProfit))
+
+    table.cell(m23_ddsTable,0,14,"Bars")
+    table.cell(m23_ddsTable,1,14,str.tostring(m17_packet_tradeBars))
+
+    table.cell(m23_ddsTable,0,15,"Float")
+    table.cell(m23_ddsTable,1,15,str.tostring(m17_packet_tradeFloating))
+
+    table.cell(m23_ddsTable,0,16,"MFE")
+    table.cell(m23_ddsTable,1,16,str.tostring(m17_packet_tradeMFE))
+
+    table.cell(m23_ddsTable,0,17,"MAE")
+    table.cell(m23_ddsTable,1,17,str.tostring(m17_packet_tradeMAE))
              
 //======================================================================
 // MODULE 23.09 - DDS HOOK
