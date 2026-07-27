@@ -995,14 +995,14 @@ var bool tradeNewSignal = false
 
 tradeNewSignal := false
 
-if g_dashboardSignal != tradeLastSignal
+if g_signal != tradeLastSignal
 
-    if g_dashboardSignal == SIGNAL_BUY or
-       g_dashboardSignal == SIGNAL_SELL
+    if g_signal == SIGNAL_BUY or
+       g_signal == SIGNAL_SELL
 
         tradeNewSignal := true
 
-    tradeLastSignal := g_dashboardSignal
+    tradeLastSignal := g_signal
 
 //--------------------------------------------------
 // READY STATE
@@ -1012,9 +1012,9 @@ if not tradeRunning and tradeNewSignal
 
     tradeState := TRADE_READY
 
-    if g_dashboardSignal == SIGNAL_BUY
+    if g_signal == SIGNAL_BUY
         g_tradeState := TS_BUY_READY
-    else if g_dashboardSignal == SIGNAL_SELL
+    else if g_signal == SIGNAL_SELL
         g_tradeState := TS_SELL_READY
     else
         g_tradeState := TS_WAIT
@@ -1024,7 +1024,7 @@ if not tradeRunning and tradeNewSignal
 //-------------------------
 
 if tradeRunning or tradeState == TRADE_READY
-    tradeDirection := g_dashboardSignal == SIGNAL_BUY ? DIR_LONG : DIR_SHORT
+    tradeDirection := g_signal == SIGNAL_BUY ? DIR_LONG : DIR_SHORT
 
 //-------------------------
 // ACTIVE State
