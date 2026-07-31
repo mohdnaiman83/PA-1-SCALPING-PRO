@@ -1,0 +1,219 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
+// © MohdNaiman (Premium FCPO Edition - Clone v1.2.3)
+
+//@version=6
+indicator("PA-1 PREMIUM v1.2.3 - FCPO (BURSA)", overlay = true, max_labels_count = 500)
+
+//==================================================
+// M01 - INPUT & CONFIG (FCPO CALIBRATED)
+//==================================================
+
+// ----- ORB Time Zone -----
+useSession  = input.bool(true, "Aktifkan Penapis Waktu (ORB Session)")
+sessionTime = input.session("1030-1230,1430-1800,2100-2330", "Zon Waktu Sesi FCPO (MYT)")
+
+// ----- Multi-Timeframe -----
+useMTF  = input.bool(true, "Aktifkan Multi-Timeframe (MTF)")
+mtfRes  = input.timeframe("15", "Higher Timeframe (HTF) Selection")
+
+// ----- Swing -----
+swingLen = input.int(5, "Swing Length (Filter Strength)", minval = 2)
+
+// ----- Risk & Position Sizing -----
+accountBalance = input.float(20000.0, "Account Balance (RM)", minval = 1.0)
+accountRisk    = input.float(1.0, "Risk Per Trade (%)", minval = 0.1, maxval = 10.0, step = 0.1)
+tpTicks        = input.int(50, "Take Profit (Mata/Ticks)", minval = 10)
+slBuffer       = input.int(15, "SL Buffer (Mata/Ticks)", minval = 0)
+
+// ----- Marker -----
+showBO = input.bool(true, "Show Breakout Marker")
+showRT = input.bool(true, "Show Retest Marker")
+
+// ----- Dashboard -----
+showDash     = input.bool(true, "Show Dashboard")
+dashPosition = input.string("Top Right", "Dashboard Position", options = ["Top Left", "Top Right", "Bottom Left", "Bottom Right"])
+
+//==================================================
+// CONSTANTS & GLOBALS
+//==================================================
+
+tick          = syminfo.mintick
+BODY_CONFIRM  = 0.50
+RT_BUFFER     = 2
+
+var string setup = "WAIT"
+var float structureHigh = na
+var float structureLow  = na
+var bool breakoutLock = false
+
+// Retest State
+var bool retestReady       = false
+var bool waitingBuyReject  = false
+var bool waitingSellReject = false
+var bool retestDone = false
+var int breakoutBar = na
+
+// Signal Triggers
+bool boBuy  = false
+bool boSell = false
+bool rtBuy  = false
+bool rtSell = false
+
+var box topBox = na
+var box botBox = na
+
+dashPos =
+     dashPosition == "Top Left" ? position.top_left :
+     dashPosition == "Top Right" ? position.top_right :
+     dashPosition == "Bottom Left" ? position.bottom_left :
+     position.bottom_right
+
+// Kunci Sesi Waktu Malaysia
+inSession = not useSession or not na(time(timeframe.period, sessionTime + ":1234567", "Asia/Kuala_Lumpur"))
+bgcolor(useSession and inSession ? color.new(color.teal, 96) : na, title="ORB Session Background")
+
+//==================================================
+// M02 - HIGH-QUALITY STRUCTURE ENGINE (Guna Blok Kunci v1.2.3)
+//==================================================
+
+float pHiRaw = ta.pivothigh(high, swingLen, swingLen)
+float pLoRaw = ta.pivotlow(low, swingLen, swingLen)
+
+float htfHigh = request.security(syminfo.tickerid, mtfRes, pHiRaw, barmerge.gaps_off, barmerge.lookahead_off)
+float htfLow  = request.security(syminfo.tickerid, mtfRes, pLoRaw, barmerge.gaps_off, barmerge.lookahead_off)
+
+float finalHigh = useMTF ? htfHigh : pHiRaw
+float finalLow  = useMTF ? htfLow : pLoRaw
+
+if finalHigh != structureHigh or na(structureHigh)
+    structureHigh := finalHigh
+    breakoutLock  := false
+    retestDone    := false
+    box.delete(topBox)
+    topBox := box.new(left=bar_index - 5, top=structureHigh, right=bar_index, bottom=structureHigh - (15 * tick), 
+                      bgcolor=color.new(color.red, 92), border_color=color.new(color.red, 60), border_style=line.style_dashed)
+
+if finalLow != structureLow or na(structureLow)
+    structureLow := finalLow
+    breakoutLock := false
+    retestDone   := false
+    box.delete(botBox)
+    botBox := box.new(left=bar_index - 5, top=structureLow + (15 * tick), right=bar_index, bottom=structureLow, 
+                      bgcolor=color.new(color.green, 92), border_color=color.new(color.green, 60), border_style=line.style_dashed)
+
+if not na(topBox)
+    box.set_right(topBox, bar_index)
+if not na(botBox)
+    box.set_right(botBox, bar_index)
+
+//==================================================
+// M03 - BREAKOUT ENGINE
+//==================================================
+
+bodySize    = math.abs(close - open)
+candleSize  = high - low
+bodyPercent = candleSize > 0 ? bodySize / candleSize : 0.0
+
+buyBreak  = not breakoutLock and not na(structureHigh) and close > structureHigh and bodyPercent >= BODY_CONFIRM and inSession
+sellBreak = not breakoutLock and not na(structureLow) and close < structureLow and bodyPercent >= BODY_CONFIRM and inSession
+
+if buyBreak
+    boBuy := true
+    setup := "BO BUY"
+    breakoutLock := true
+    retestReady := true
+    waitingBuyReject := true
+    waitingSellReject := false
+    breakoutBar := bar_index
+    retestDone := false
+
+if sellBreak
+    boSell := true
+    setup := "BO SELL"
+    breakoutLock := true
+    retestReady := true
+    waitingSellReject := true
+    waitingBuyReject := false
+    breakoutBar := bar_index
+    retestDone := false
+
+// Salin bulat-bulat fungsi plotshape v1.2.3 kegemaran kau
+plotshape(showBO and boBuy, title="BO BUY", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.tiny)
+plotshape(showBO and boSell, title="BO SELL", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.tiny)
+
+//==================================================
+// M04 - RETEST ENGINE
+//==================================================
+
+buyRetest  = retestReady and waitingBuyReject and not retestDone and bar_index > breakoutBar and low <= structureHigh + (RT_BUFFER * tick) and close > structureHigh and close > open and inSession
+sellRetest = retestReady and waitingSellReject and not retestDone and bar_index > breakoutBar and high >= structureLow - (RT_BUFFER * tick) and close < structureLow and close < open and inSession
+
+if buyRetest
+    rtBuy := true
+    setup := "RT BUY"
+    retestDone := true
+    retestReady := false
+    waitingBuyReject := false
+
+if sellRetest
+    rtSell := true
+    setup := "RT SELL"
+    retestDone := true
+    retestReady := false
+    waitingSellReject := false
+
+plotshape(showRT and rtBuy, title="RT BUY", style=shape.diamond, location=location.belowbar, color=color.yellow, size=size.tiny)
+plotshape(showRT and rtSell, title="RT SELL", style=shape.diamond, location=location.abovebar, color=color.orange, size=size.tiny)
+
+//==================================================
+// M07 - DYNAMIC DASHBOARD & POSITION SIZING ENGINE (FCPO EDITION)
+//==================================================
+
+var table dashTable = table.new(position = dashPos, columns = 2, rows = 6, bgcolor = color.new(color.black, 20), border_width = 1, border_color = color.gray)
+
+float entryPrice = close
+var float targetSL   = na
+var float targetTP   = na
+
+if boBuy or rtBuy
+    targetSL := structureLow - (slBuffer * tick)
+    targetTP := entryPrice + (tpTicks * tick)
+else if boSell or rtSell
+    targetSL := structureHigh + (slBuffer * tick)
+    targetTP := entryPrice - (tpTicks * tick)
+
+bool isInvalid = false
+if setup == "BO BUY" or setup == "RT BUY"
+    if not na(targetSL) and close < targetSL
+        isInvalid := true
+else if setup == "BO SELL" or setup == "RT SELL"
+    if not na(targetSL) and close > targetSL
+        isInvalid := true
+
+string currentSetupDisplay = isInvalid ? "INVALID" : (not inSession ? "OUT OF SESSION" : setup)
+
+// Formula Contracts FCPO RM25 tetap stabil
+float riskAmountMYR = accountBalance * (accountRisk / 100.0)
+float pointsAtRisk  = not na(targetSL) ? math.abs(entryPrice - targetSL) : na
+float calculatedLot = not na(pointsAtRisk) and pointsAtRisk > 0 and not isInvalid and inSession ? riskAmountMYR / (pointsAtRisk * 25.0) : 0.0
+
+if showDash and barstate.islast
+    string titleText = useMTF ? "PA-1 FCPO MTF (" + mtfRes + "m)" : "PA-1 FCPO LOCAL"
+    table.cell(dashTable, 0, 0, titleText, text_color=color.white, text_size=size.small, bgcolor=color.green)
+    table.cell(dashTable, 1, 0, "VALUES", text_color=color.white, text_size=size.small, bgcolor=color.green)
+    
+    color statusColor = currentSetupDisplay == "INVALID" or currentSetupDisplay == "OUT OF SESSION" ? color.new(color.gray, 30) : (setup == "WAIT" ? color.gray : (str.contains(setup, "BUY") ? color.green : color.red))
+    table.cell(dashTable, 0, 1, "Current Setup:", text_color=color.white, text_size=size.small)
+    table.cell(dashTable, 1, 1, currentSetupDisplay, text_color=color.white, text_size=size.small, bgcolor=statusColor)
+    
+    table.cell(dashTable, 0, 2, "Est. Entry Price:", text_color=color.white, text_size=size.small)
+    table.cell(dashTable, 1, 2, str.tostring(entryPrice, "#") + " MYR", text_color=color.yellow, text_size=size.small)
+    
+    table.cell(dashTable, 0, 3, "Target TP / SL:", text_color=color.white, text_size=size.small)
+    table.cell(dashTable, 1, 3, "TP: " + str.tostring(targetTP, "#") + " \nSL: " + str.tostring(targetSL, "#"), text_color=color.orange, text_size=size.small)
+    
+    table.cell(dashTable, 0, 4, "Market Type:", text_color=color.white, text_size=size.small)
+    table.cell(dashTable, 1, 4, "BURSA FUTURES", text_color=color.white, text_size=size.small)
+
+    table.cell(dashTable, 0, 5, "Recommended Lot:", text_color=color.white, text_size=size.small)
+    table.cell(dashTable, 1, 5, str.tostring(calculatedLot, "0.00") + " Contracts", text_color=color.lime, text_size=size.small)
